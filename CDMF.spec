@@ -48,7 +48,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        'matplotlib',  # Reduce size if not needed for UI
+        # Note: matplotlib is used by some dependencies but excluded to reduce bundle size
+        # If you encounter import errors, remove this exclusion
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

@@ -51,10 +51,6 @@ release/
 *.app
 *.spec.bak
 
-# ---- PyInstaller ----
-*.pyc
-__pycache__/
-
 # ---- Minification / tooling caches ----
 node_modules/
 npm-debug.log*
