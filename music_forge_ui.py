@@ -164,6 +164,7 @@ def main() -> None:
 
     is_frozen = getattr(sys, "frozen", False)
 
+    # macOS-focused: Use webbrowser to open loading page or main URL
     if is_frozen:
         try:
             static_root = Path(app.static_folder or (cdmf_paths.APP_DIR / "static"))
@@ -171,15 +172,9 @@ def main() -> None:
 
             if loader_path.exists():
                 try:
-                    if sys.platform.startswith("win"):
-                        os.startfile(str(loader_path))  # type: ignore[attr-defined]
-                    else:
-                        webbrowser.open(loader_path.as_uri())
+                    webbrowser.open(loader_path.as_uri())
                 except Exception:
-                    try:
-                        webbrowser.open(loader_path.as_uri())
-                    except Exception:
-                        webbrowser.open("http://127.0.0.1:5056/")
+                    webbrowser.open("http://127.0.0.1:5056/")
             else:
                 webbrowser.open("http://127.0.0.1:5056/")
         except Exception as e:

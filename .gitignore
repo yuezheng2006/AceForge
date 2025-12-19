@@ -74,3 +74,7 @@ Desktop.ini
 
 # ---- Optional: keep binaries out of source control ----
 CDMF.exe
+
+# ---- macOS fork notes ----
+# CDMF.bat and requirements_ace_windows_reference.txt kept for reference only
+# This fork is macOS-focused; use CDMF.sh and requirements_ace_macos.txt

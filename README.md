@@ -1,8 +1,10 @@
-# Candy Dungeon Music Forge (CDMF)
+# Candy Dungeon Music Forge (CDMF) - macOS Edition
 
-Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for Windows and macOS**. It runs on your PC or Mac, uses your GPU (NVIDIA CUDA or Apple Metal), and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
+Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
 
-Status: **v0.1**
+This fork is optimized for macOS with Apple Metal support, designed for both Apple Silicon (M1/M2/M3) and Intel Macs.
+
+Status: **v0.1-macos**
 
 ## What you can do
 
@@ -17,64 +19,52 @@ Status: **v0.1**
 
 ## System requirements
 
-### Windows
+### Minimum
 
-Minimum:
-- Windows 10/11 (64-bit)
-- NVIDIA GPU (RTX strongly recommended)
-- ~10–12 GB VRAM (more = more headroom)
-- SSD with tens of GB free (models + audio + datasets)
-
-Comfortable:
-- RTX GPU with 12–24 GB VRAM
-- 32 GB RAM
-- Fast NVMe SSD
-- Comfort reading console logs when something goes wrong
-
-### macOS
-
-Minimum:
 - macOS 12.0 (Monterey) or later
 - Apple Silicon (M1/M2/M3) or Intel Mac with AMD GPU
 - 16 GB unified memory (for Apple Silicon) or 16 GB RAM
 - ~10–12 GB VRAM/unified memory (more = more headroom)
 - SSD with tens of GB free (models + audio + datasets)
+- Python 3.10 or later
 
-Comfortable:
+### Recommended
+
 - Apple Silicon M1 Pro/Max/Ultra, M2 Pro/Max/Ultra, or M3 Pro/Max
 - 32 GB+ unified memory
 - Fast SSD
 - Comfort reading terminal logs when something goes wrong
 
-**Note:** Apple Metal (MPS) support enables GPU acceleration on both Apple Silicon and Intel Macs with compatible AMD GPUs. Performance is optimized for Apple Silicon.
+**Note:** Apple Metal (MPS) support enables GPU acceleration on both Apple Silicon and Intel Macs with compatible AMD GPUs. Performance is optimized for Apple Silicon with unified memory architecture.
 
 ## Install and run
 
-### Windows (recommended)
+### Prerequisites
 
-1. Download the latest release (installer)
-2. Run `CandyDungeonMusicForge-Setup.exe`
-3. Launch **Candy Dungeon Music Forge** from the Start Menu
+Ensure you have Python 3.10 or later installed:
+```bash
+# Check Python version
+python3 --version
 
-Default install location:
-- `%LOCALAPPDATA%\CandyDungeonMusicForge`
+# If not installed, install via Homebrew
+brew install python@3.10
+```
 
-### macOS
+### Installation
 
-1. Ensure you have Python 3.10 or later installed:
+1. Clone this repository:
    ```bash
-   # Check Python version
-   python3 --version
-   
-   # If not installed, install via Homebrew
-   brew install python@3.10
+   git clone https://github.com/audiohacking/CDMF-Fork.git
+   cd CDMF-Fork
    ```
 
-2. Clone or download this repository
-
-3. Navigate to the CDMF directory and run the launcher:
+2. Make the launcher script executable:
    ```bash
-   cd /path/to/CDMF-Fork
+   chmod +x CDMF.sh
+   ```
+
+3. Run the launcher:
+   ```bash
    ./CDMF.sh
    ```
 
@@ -85,10 +75,7 @@ Default install location:
    - Install helpers like `audio-separator`
    - Open the UI in your default browser
 
-**Note:** You may need to make the script executable:
-```bash
-chmod +x CDMF.sh
-```
+The terminal window must remain open while CDMF is running. Press Ctrl+C to stop the server.
 
 ### First launch notes
 
@@ -160,14 +147,11 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 ## Troubleshooting
 
-### General Issues
+### Common Issues
 
-- **First launch takes forever**: check console for pip/model download errors; verify disk space and network
-- **No .wav files found**: generate a track; confirm Output Directory matches the Music Player folder
-
-### Windows-Specific
-
-- **CUDA / VRAM OOM**:
+- **First launch takes forever**: Check terminal for pip/model download errors; verify disk space and network
+- **No .wav files found**: Generate a track; confirm Output Directory matches the Music Player folder
+- **Memory issues**: 
   - Reduce target length during generation
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
@@ -177,7 +161,11 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 - **MPS (Metal) backend errors**: 
   - Ensure you're running macOS 12.0+ for MPS support
   - Some operations may fall back to CPU if not yet supported on MPS
-  - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues
+  - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues:
+    ```bash
+    export ACE_PIPELINE_DTYPE=float32
+    ./CDMF.sh
+    ```
 
 - **Python version issues**:
   ```bash
@@ -196,6 +184,50 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 - **Browser doesn't open automatically**: 
   - Manually navigate to `http://127.0.0.1:5056/` in your browser
   - Check if the terminal shows any error messages
+
+- **Virtual environment issues**:
+  ```bash
+  # Remove existing venv and recreate
+  rm -rf venv_ace
+  ./CDMF.sh
+  ```
+
+## Performance Tips for Apple Silicon
+
+- **Unified memory management**: Apple Silicon Macs with unified memory can efficiently share memory between CPU and GPU
+- **Batch sizes**: Start with smaller batch sizes and gradually increase to find optimal performance
+- **Model precision**: The pipeline automatically selects appropriate precision for MPS (float32 instead of bfloat16)
+- **Generation length**: Longer generation times may require more memory; start with shorter durations and scale up
+
+## About This Fork
+
+This is a **macOS-optimized fork** of Candy Dungeon Music Forge, specifically designed for Apple Metal (MPS) GPU acceleration. This fork focuses exclusively on macOS support and does not maintain Windows compatibility.
+
+### Differences from Original
+
+- **Apple Metal (MPS) GPU support**: Optimized for Apple Silicon and Intel Macs with AMD GPUs
+- **Device-agnostic code**: Automatic device selection (MPS → CPU fallback)
+- **macOS launcher**: Native bash script (`CDMF.sh`) instead of Windows batch file
+- **Unified memory optimizations**: Leverages Apple Silicon's unified memory architecture
+- **macOS-specific dependencies**: Windows-specific packages removed
+
+### Porting Updates from Upstream
+
+To port updates from the original Windows version:
+
+1. The original Windows requirements are preserved in `requirements_ace_windows_reference.txt`
+2. The original Windows launcher is in `CDMF.bat`
+3. When merging updates, focus on:
+   - Core model and pipeline logic
+   - UI and generation features
+   - Dataset and training functionality
+4. Adapt any Windows-specific or CUDA-only code to be device-agnostic
+5. Test thoroughly with MPS backend
+
+Key files for cross-platform compatibility:
+- `cdmf_pipeline_ace_step.py` - Device selection and memory management
+- `cdmf_trainer.py` - Training with device-agnostic autocast
+- `music_forge_ui.py` - Browser opening logic
 
 ## Contributing
 

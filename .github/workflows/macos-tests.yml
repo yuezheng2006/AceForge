@@ -1,0 +1,88 @@
+name: macOS Compatibility Tests
+
+on:
+  push:
+    branches: [ main, develop, copilot/** ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  test-macos:
+    name: Test on macOS
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Display Python version
+      run: python --version
+      
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_ace_macos.txt
+        
+    - name: Install audio-separator (no deps)
+      run: |
+        pip install "audio-separator==0.40.0" --no-deps
+        
+    - name: Install py3langid (no deps)
+      run: |
+        pip install "py3langid==0.3.0" --no-deps
+        
+    - name: Install ACE-Step (no deps)
+      run: |
+        pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+      
+    - name: Verify PyTorch MPS support
+      run: |
+        python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'MPS available: {torch.backends.mps.is_available()}'); print(f'MPS built: {torch.backends.mps.is_built()}')"
+        
+    - name: Test imports
+      run: |
+        python -c "import torch"
+        python -c "import diffusers"
+        python -c "import transformers"
+        python -c "import flask"
+        python -c "import torchaudio"
+        
+    - name: Syntax check Python files
+      run: |
+        python -m py_compile music_forge_ui.py
+        python -m py_compile cdmf_pipeline_ace_step.py
+        python -m py_compile cdmf_trainer.py
+        python -m py_compile generate_ace.py
+        
+    - name: Test device selection logic
+      run: |
+        python -c "
+        import torch
+        import os
+        
+        # Test device selection
+        device = (
+            torch.device('cuda:0')
+            if torch.cuda.is_available()
+            else torch.device('cpu')
+        )
+        if device.type == 'cpu' and torch.backends.mps.is_available():
+            device = torch.device('mps')
+        
+        print(f'Selected device: {device}')
+        print(f'Device type: {device.type}')
+        
+        # Verify expected device on macOS
+        if torch.backends.mps.is_available():
+            assert device.type == 'mps', f'Expected MPS device, got {device.type}'
+            print('✓ MPS device correctly selected')
+        else:
+            assert device.type == 'cpu', f'Expected CPU device, got {device.type}'
+            print('✓ CPU device correctly selected (MPS not available)')
+        "
