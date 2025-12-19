@@ -1,17 +1,9 @@
-# Candy Dungeon Music Forge - macOS Requirements
-# This file contains dependencies for running CDMF on macOS with Apple Metal (MPS) support
-# Windows-specific packages (pywin32-ctypes, win32_setctime) have been removed
-# PyTorch is installed with native MPS support for Apple Silicon and Intel Macs
+# Candy Dungeon Music Forge - Windows Requirements (REFERENCE ONLY)
+# This is the original Windows requirements file, preserved for reference when porting updates from upstream
+# This macOS fork uses requirements_ace_macos.txt instead
+# Windows-specific packages: pywin32-ctypes, win32_setctime
+# PyTorch CUDA wheels from https://download.pytorch.org/whl/cu126
 
-# Candy Dungeon Music Forge - macOS Requirements
-# This file contains dependencies for running CDMF on macOS with Apple Metal (MPS) support
-# Windows-specific packages (pywin32-ctypes, win32_setctime) have been removed
-# PyTorch is installed with native MPS support for Apple Silicon and Intel Macs
-
-absl-py==2.3.1
-accelerate==1.6.0
-aiofiles==23.2.1
-aiohappyeyeballs==2.6.1
 aiohttp==3.13.2
 aiosignal==1.4.0
 altgraph==0.17.5
