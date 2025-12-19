@@ -1,8 +1,10 @@
-# Candy Dungeon Music Forge (CDMF)
+# AceForge - macOS Edition
 
-Candy Dungeon Music Forge (CDMF) is a **local-first AI music workstation for Windows**. It runs on your PC, uses your GPU, and keeps your prompts and audio on your hardware. CDMF is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
+AceForge is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. AceForge is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
 
-Status: **v0.1**
+This fork is optimized for macOS with Apple Metal support, designed for both Apple Silicon (M1/M2/M3) and Intel Macs.
+
+Status: **v0.1-macos**
 
 ## What you can do
 
@@ -17,40 +19,89 @@ Status: **v0.1**
 
 ## System requirements
 
-Minimum:
-- Windows 10/11 (64-bit)
-- NVIDIA GPU (RTX strongly recommended)
-- ~10–12 GB VRAM (more = more headroom)
+### Minimum
+
+- macOS 12.0 (Monterey) or later
+- Apple Silicon (M1/M2/M3) or Intel Mac with AMD GPU
+- 16 GB unified memory (for Apple Silicon) or 16 GB RAM
+- ~10–12 GB VRAM/unified memory (more = more headroom)
 - SSD with tens of GB free (models + audio + datasets)
+- Python 3.10 or later
 
-Comfortable:
-- RTX GPU with 12–24 GB VRAM
-- 32 GB RAM
-- Fast NVMe SSD
-- Comfort reading console logs when something goes wrong
+### Recommended
 
-## Install and run (recommended)
+- Apple Silicon M1 Pro/Max/Ultra, M2 Pro/Max/Ultra, or M3 Pro/Max
+- 32 GB+ unified memory
+- Fast SSD
+- Comfort reading terminal logs when something goes wrong
 
-1. Download the latest release (installer)
-2. Run `CandyDungeonMusicForge-Setup.exe`
-3. Launch **Candy Dungeon Music Forge** from the Start Menu
+**Note:** Apple Metal (MPS) support enables GPU acceleration on both Apple Silicon and Intel Macs with compatible AMD GPUs. Performance is optimized for Apple Silicon with unified memory architecture.
 
-Default install location:
-- `%LOCALAPPDATA%\CandyDungeonMusicForge`
+## Install and run
 
-### First launch notes
+### Option 1: Download Pre-built Release (Easiest)
 
-On first run, CDMF does real setup work:
+**Coming Soon!** Pre-built macOS application bundles will be available from the [Releases page](https://github.com/audiohacking/AceForge-Fork/releases).
+
+1. Download `AceForge-macOS.dmg` from the latest release
+2. Open the DMG file
+3. Drag `AceForge.app` to your Applications folder
+4. Right-click the app and select "Open" (first time only, to bypass Gatekeeper)
+5. The application will start and open in your browser
+
+**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically.
+
+### Option 2: Run from Source
+
+#### Prerequisites
+
+Ensure you have Python 3.10 or later installed:
+```bash
+# Check Python version
+python3 --version
+
+# If not installed, install via Homebrew
+brew install python@3.10
+```
+
+#### Installation
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/audiohacking/AceForge-Fork.git
+   cd AceForge-Fork
+   ```
+
+2. Make the launcher script executable:
+   ```bash
+   chmod +x AceForge.sh
+   ```
+
+3. Run the launcher:
+   ```bash
+   ./AceForge.sh
+   ```
+
+4. On first run, the script will:
+   - Create a Python virtual environment (`venv_ace`)
+   - Install packages from `requirements_ace_macos.txt`
+   - Download ACE-Step and related models as needed
+   - Install helpers like `audio-separator`
+   - Open the UI in your default browser
+
+The terminal window must remain open while AceForge is running. Press Ctrl+C to stop the server.
+
+On first run, AceForge does real setup work:
 - Creates a Python virtual environment (e.g. `venv_ace`)
 - Installs packages from `requirements_ace.txt`
 - Downloads ACE-Step and related models as needed
 - Installs helpers like `audio-separator`
 
-A console window (“server console”) appears and **must stay open** while CDMF runs. CDMF will open a loading page in your browser and then load the full UI when ready.
+A console window (“server console”) appears and **must stay open** while AceForge runs. AceForge will open a loading page in your browser and then load the full UI when ready.
 
-## Using CDMF (high-level workflow)
+## Using AceForge (high-level workflow)
 
-1. Launch CDMF and wait for the UI
+1. Launch AceForge and wait for the UI
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
 4. (Optional) Use stem controls to adjust vocal/instrumental balance
@@ -61,14 +112,14 @@ A console window (“server console”) appears and **must stay open** while CDM
 - **Prompt**: your main ACE-Step tags / description (genre, instruments, mood, context)
 - **Instrumental** mode:
   - Lyrics are not used
-  - CDMF uses the `[inst]` token so ACE-Step focuses on backing tracks
+  - AceForge uses the `[inst]` token so ACE-Step focuses on backing tracks
 - **Vocal** mode:
   - Provide lyrics using markers like `[verse]`, `[chorus]`, `[solo]`, etc.
 - **Presets** let you save/load a whole “knob bundle” (text + sliders)
 
 ## Stem separation (vocals vs instrumentals)
 
-CDMF can run `audio-separator` as a post-process step so you can rebalance:
+AceForge can run `audio-separator` as a post-process step so you can rebalance:
 - Vocals level (dB)
 - Instrumental level (dB)
 
@@ -82,13 +133,13 @@ Switch to the **Training** tab to configure and start LoRA runs.
 
 Datasets must live under:
 
-`<CDMF root>\training_datasets`
+`<AceForge root>\training_datasets`
 
 For each audio file (`foo.mp3` or `foo.wav`), provide:
 - `foo_prompt.txt` — ACE-Step prompt/tags for that track
 - `foo_lyrics.txt` — lyrics, or `[inst]` for instrumentals
 
-CDMF includes tools to bulk-create these files (and optionally auto-generate them with MuFun-ACEStep).
+AceForge includes tools to bulk-create these files (and optionally auto-generate them with MuFun-ACEStep).
 
 ### Training parameters (examples)
 
@@ -108,12 +159,137 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 ## Troubleshooting
 
-- **First launch takes forever**: check console for pip/model download errors; verify disk space and network
-- **No .wav files found**: generate a track; confirm Output Directory matches the Music Player folder
-- **CUDA / VRAM OOM**:
+### Common Issues
+
+- **First launch takes forever**: Check terminal for pip/model download errors; verify disk space and network
+- **No .wav files found**: Generate a track; confirm Output Directory matches the Music Player folder
+- **Memory issues**: 
   - Reduce target length during generation
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
+
+### macOS-Specific
+
+- **MPS (Metal) backend errors**: 
+  - Ensure you're running macOS 12.0+ for MPS support
+  - Some operations may fall back to CPU if not yet supported on MPS
+  - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues:
+    ```bash
+    export ACE_PIPELINE_DTYPE=float32
+    ./AceForge.sh
+    ```
+
+- **Python version issues**:
+  ```bash
+  # Ensure you have Python 3.10 or later
+  python3 --version
+  
+  # Install via Homebrew if needed
+  brew install python@3.10
+  ```
+
+- **Permission denied when running AceForge.sh**:
+  ```bash
+  chmod +x AceForge.sh
+  ```
+
+- **Browser doesn't open automatically**: 
+  - Manually navigate to `http://127.0.0.1:5056/` in your browser
+  - Check if the terminal shows any error messages
+
+- **Virtual environment issues**:
+  ```bash
+  # Remove existing venv and recreate
+  rm -rf venv_ace
+  ./AceForge.sh
+  ```
+
+## Performance Tips for Apple Silicon
+
+- **Unified memory management**: Apple Silicon Macs with unified memory can efficiently share memory between CPU and GPU
+- **Batch sizes**: Start with smaller batch sizes and gradually increase to find optimal performance
+- **Model precision**: The pipeline automatically selects appropriate precision for MPS (float32 instead of bfloat16)
+- **Generation length**: Longer generation times may require more memory; start with shorter durations and scale up
+
+## About This Fork
+
+This is a **macOS-optimized** version specifically designed for Apple Metal (MPS) GPU acceleration. This fork focuses exclusively on macOS support and does not maintain Windows compatibility.
+
+### Differences from Original
+
+- **Apple Metal (MPS) GPU support**: Optimized for Apple Silicon and Intel Macs with AMD GPUs
+- **Device-agnostic code**: Automatic device selection (MPS → CPU fallback)
+- **macOS launcher**: Native bash script (`AceForge.sh`) instead of Windows batch file
+- **Unified memory optimizations**: Leverages Apple Silicon's unified memory architecture
+- **macOS-specific dependencies**: Windows-specific packages removed
+
+### Porting Updates from Upstream
+
+To port updates from the original Windows version:
+
+1. The original Windows requirements are preserved in `requirements_ace_windows_reference.txt`
+2. The original Windows launcher is in `AceForge.bat`
+3. When merging updates, focus on:
+   - Core model and pipeline logic
+   - UI and generation features
+   - Dataset and training functionality
+4. Adapt any Windows-specific or CUDA-only code to be device-agnostic
+5. Test thoroughly with MPS backend
+
+Key files for cross-platform compatibility:
+- `cdmf_pipeline_ace_step.py` - Device selection and memory management
+- `cdmf_trainer.py` - Training with device-agnostic autocast
+- `music_forge_ui.py` - Browser opening logic
+
+## Building Releases
+
+Pre-built macOS application bundles are automatically created via GitHub Actions. To build locally or create a new release:
+
+### Automated Build (GitHub Actions)
+
+1. Create a new release on GitHub
+2. The build workflow will automatically trigger
+3. DMG and ZIP files will be attached to the release
+
+Or manually trigger the build:
+```bash
+# Via GitHub Actions UI:
+# Go to Actions > Build macOS Release > Run workflow
+```
+
+### Manual Build (Local)
+
+Requirements:
+- macOS system with Python 3.10+
+- All dependencies installed (`requirements_ace_macos.txt`)
+
+Steps:
+```bash
+# Install dependencies
+pip install -r requirements_ace_macos.txt
+pip install "audio-separator==0.40.0" --no-deps
+pip install "py3langid==0.3.0" --no-deps
+pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
+
+# Build with PyInstaller
+pyinstaller AceForge.spec
+
+# The .app bundle will be in dist/AceForge.app
+
+# Optional: Create DMG
+hdiutil create -volname "AceForge" \
+  -srcfolder dist/AceForge.app \
+  -ov -format UDZO \
+  AceForge-macOS.dmg
+```
+
+The build process creates a self-contained macOS application that includes:
+- Python runtime and all dependencies
+- Static files (HTML, CSS, JS)
+- Configuration files
+- Documentation
+
+**Note:** The app bundle does NOT include the large AI model files (~several GB). These are downloaded automatically on first run.
 
 ## Contributing
 
@@ -126,17 +302,10 @@ Issues and PRs welcome. If you’re changing anything related to training, model
 ## License
 
 This project’s **source code** is licensed under the **Apache License 2.0**. See `LICENSE`.
-
-Note: Model weights and third-party tools used by CDMF (ACE-Step, PyTorch, audio-separator, MuFun-ACEStep, any LLM backend, etc.) are covered by their own licenses/terms.
-
 ## Trademarks
 
-“Candy Dungeon”, “Candy Dungeon Music Forge”, and associated logos/branding are **trademarks of the project owner** and are **not** granted under the Apache-2.0 license.
-
-See `TRADEMARKS.md` for permitted use (e.g., descriptive references are fine; distributing a fork under the same name/logo is not).
+This project was originally forked from a project with trademarked branding ("Candy Dungeon"). All such trademarked names and branding have been removed from this fork to comply with trademark regulations. This project is now known as "AceForge".
 
 ## Support
 
-If you find CDMF useful and want to support development, you can:
-- email support@candydungeon.com for more info
-- Contribute to the creator's Ko-Fi and buy him a coffee/cigar if you want: https://ko-fi.com/davidhagar
+If you find AceForge useful and want to support development, you can open issues or contribute via pull requests on GitHub.

@@ -1,4 +1,4 @@
-# C:\CandyDungeonMusicForge\music_forge_ui.py
+# C:\AceForge\music_forge_ui.py
 
 from __future__ import annotations
 
@@ -22,20 +22,20 @@ try:
             )
             _cdmf_dl.FromSingleFileMixin = _CDMF_FSM  # type: ignore[attr-defined]
             print(
-                "[Candy Music Forge] Early-patched diffusers.loaders.FromSingleFileMixin "
+                "[AceForge] Early-patched diffusers.loaders.FromSingleFileMixin "
                 "for ace-step.",
                 flush=True,
             )
         except Exception as _e:
             print(
-                "[Candy Music Forge] WARNING: Could not expose "
+                "[AceForge] WARNING: Could not expose "
                 "diffusers.loaders.FromSingleFileMixin early: "
                 f"{_e}",
                 flush=True,
             )
 except Exception as _e:
     print(
-        "[Candy Music Forge] WARNING: Failed to import diffusers.loaders "
+        "[AceForge] WARNING: Failed to import diffusers.loaders "
         f"for early compatibility patch: {_e}",
         flush=True,
     )
@@ -157,13 +157,14 @@ def main() -> None:
                 )
 
     print(
-        "Starting Candy Dungeon Music Forge (ACE-Step Edition v0.1) "
+        "Starting AceForge (ACE-Step Edition v0.1) "
         "on http://127.0.0.1:5056/ ...",
         flush=True,
     )
 
     is_frozen = getattr(sys, "frozen", False)
 
+    # macOS-focused: Use webbrowser to open loading page or main URL
     if is_frozen:
         try:
             static_root = Path(app.static_folder or (cdmf_paths.APP_DIR / "static"))
@@ -171,20 +172,14 @@ def main() -> None:
 
             if loader_path.exists():
                 try:
-                    if sys.platform.startswith("win"):
-                        os.startfile(str(loader_path))  # type: ignore[attr-defined]
-                    else:
-                        webbrowser.open(loader_path.as_uri())
+                    webbrowser.open(loader_path.as_uri())
                 except Exception:
-                    try:
-                        webbrowser.open(loader_path.as_uri())
-                    except Exception:
-                        webbrowser.open("http://127.0.0.1:5056/")
+                    webbrowser.open("http://127.0.0.1:5056/")
             else:
                 webbrowser.open("http://127.0.0.1:5056/")
         except Exception as e:
             print(
-                f"[Candy Music Forge] Failed to open browser automatically: {e}",
+                f"[AceForge] Failed to open browser automatically: {e}",
                 flush=True,
             )
             try:
