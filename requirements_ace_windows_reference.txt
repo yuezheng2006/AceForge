@@ -144,11 +144,8 @@ threadpoolctl==3.6.0
 tokenizers==0.21.4
 tomlkit==0.13.3
 torchcodec==0.8.1
-# PyTorch with MPS (Metal) support for macOS
+# PyTorch CUDA wheels (original Windows configuration)
 torch==2.4.0
-torchvision==0.19.0
-torchaudio==2.4.0
-# PyTorch with MPS (Metal) support for macOS
 torch==2.4.0
 torchvision==0.19.0
 torchaudio==2.4.0
