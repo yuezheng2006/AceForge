@@ -95,15 +95,17 @@ echo "[CDMF] Ensuring pip is available / up to date..."
 "${VENV_PY}" -m pip install --upgrade pip
 
 # ---------------------------------------------------------------------------
-#  Install app requirements into venv_ace (excluding ace_step / torch)
+#  Install app requirements into venv_ace
 # ---------------------------------------------------------------------------
 echo "[CDMF] Installing dependencies from requirements_ace_macos.txt..."
 "${VENV_PY}" -m pip install -r "${REQ_FILE}"
 
-echo "[CDMF] Installing audio-separator (ignoring beartype's version constraint)..."
+# Note: These packages have specific version conflicts with other dependencies
+# and need to be installed with --no-deps to avoid breaking the environment
+echo "[CDMF] Installing audio-separator (--no-deps due to beartype version conflict)..."
 "${VENV_PY}" -m pip install "audio-separator==0.40.0" --no-deps
 
-echo "[CDMF] Installing py3langid (ignoring its numpy>=2.0.0 requirement)..."
+echo "[CDMF] Installing py3langid (--no-deps due to numpy>=2.0.0 requirement conflict)..."
 "${VENV_PY}" -m pip install "py3langid==0.3.0" --no-deps
 
 # ---------------------------------------------------------------------------
