@@ -13,7 +13,7 @@
 
     if (!audio || !list || !progress) {
       console.warn(
-        "[Candy Dungeon Music Forge] Audio player elements missing; initPlayer aborted."
+        "[Ace Forge] Audio player elements missing; initPlayer aborted."
       );
       return;
     }

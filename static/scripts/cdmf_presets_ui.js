@@ -590,7 +590,7 @@
     // Normal preset from JSON
     const preset = PRESET_INDEX[id];
     if (!preset) {
-      console.warn("[Candy Dungeon Music Forge] Unknown preset id:", id);
+      console.warn("[Ace Forge] Unknown preset id:", id);
       return;
     }
     applyPreset(preset);
@@ -636,14 +636,14 @@
       });
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /user_presets HTTP " + resp.status
+          "[Ace Forge] /user_presets HTTP " + resp.status
         );
         return;
       }
       const data = await resp.json();
       if (!data || !Array.isArray(data.presets)) {
         console.warn(
-          "[Candy Dungeon Music Forge] /user_presets payload missing presets array:",
+          "[Ace Forge] /user_presets payload missing presets array:",
           data
         );
         return;
