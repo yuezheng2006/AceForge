@@ -9,8 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The AceForge binary is in the same directory as this script
 # when running from the app bundle (Contents/MacOS/)
-# NOTE: The binary is named AceForge_bin (not AceForge) because the
-# main "AceForge" executable is the wrapper script that launches Terminal.
+# NOTE: The binary is named AceForge_bin (not AceForge) because:
+# - macos_terminal_launcher.sh is copied as the main "AceForge" executable in Contents/MacOS/
+# - The wrapper uses AppleScript to open Terminal.app and execute this script
+# - This script then executes the actual PyInstaller binary (AceForge_bin)
 # This naming scheme is coordinated with CDMF.spec and macos_terminal_launcher.sh
 EXEC_PATH="${SCRIPT_DIR}/AceForge_bin"
 

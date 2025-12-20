@@ -23,3 +23,5 @@ tell application "Terminal"
     activate
 end tell
 EOF
+
+exit 0

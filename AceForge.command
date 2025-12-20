@@ -30,4 +30,3 @@ echo ""
 
 # Open the app bundle directly
 open -a "$(pwd)/AceForge.app"
-
