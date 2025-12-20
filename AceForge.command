@@ -1,6 +1,16 @@
 #!/bin/bash
-# AceForge.command - Double-click this file to launch AceForge in Terminal
-# This file should be placed next to AceForge.app
+# AceForge Launcher
+# 
+# NOTE: This .command file is deprecated and no longer needed.
+# 
+# To launch AceForge:
+# 1. Copy AceForge.app to your Applications folder (or anywhere on your Mac)
+# 2. Double-click AceForge.app to launch it in Terminal
+#
+# The app will now automatically open in a Terminal window where you can
+# see logs and control the application.
+#
+# If you still want to use this .command file for some reason:
 
 # Get the directory where this script lives
 cd "$(dirname "$0")" || exit 1
@@ -8,10 +18,16 @@ cd "$(dirname "$0")" || exit 1
 # Check if AceForge.app exists
 if [ ! -d "AceForge.app" ]; then
     echo "Error: AceForge.app not found in this directory"
-    echo "Make sure this file is in the same folder as AceForge.app"
+    echo "Please place AceForge.app in the same folder as this script"
     read -n 1 -s -r -p "Press any key to close..."
     exit 1
 fi
 
-# Run the launcher script from inside the app bundle
-exec "./AceForge.app/Contents/MacOS/launch_in_terminal.sh"
+echo "Launching AceForge..."
+echo ""
+echo "NOTE: You can also just double-click AceForge.app directly!"
+echo ""
+
+# Open the app bundle directly
+open -a "$(pwd)/AceForge.app"
+

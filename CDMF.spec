@@ -64,7 +64,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AceForge',
+    name='AceForge_bin',  # Rename binary to AceForge_bin
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -85,7 +85,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='AceForge',
+    name='AceForge',  # Collection name stays as AceForge
 )
 
 # macOS app bundle
@@ -102,8 +102,11 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSRequiresAquaSystemAppearance': False,
-        # Launch in Terminal to keep console visible
-        'LSUIElement': False,  # Show in dock
-        'LSBackgroundOnly': False,  # Run in foreground
+        # Show in dock and run in foreground
+        'LSUIElement': False,
+        'LSBackgroundOnly': False,
+        'CFBundlePackageType': 'APPL',
+        # The main executable will be the wrapper script added by build workflow
+        'CFBundleExecutable': 'AceForge',
     },
 )
