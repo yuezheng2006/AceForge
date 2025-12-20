@@ -28,7 +28,7 @@ Status: **v0.1-macos**
 - 16 GB unified memory (for Apple Silicon) or 16 GB RAM
 - ~10–12 GB VRAM/unified memory (more = more headroom)
 - SSD with tens of GB free (models + audio + datasets)
-- Python 3.10 or later
+- Python 3.11 or later
 
 ### Recommended
 
@@ -57,7 +57,7 @@ Status: **v0.1-macos**
 
 #### Prerequisites
 
-Ensure you have Python 3.10 or later installed:
+Ensure you have Python 3.11 or later installed:
 ```bash
 # Check Python version
 python3 --version
@@ -183,11 +183,11 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 - **Python version issues**:
   ```bash
-  # Ensure you have Python 3.10 or later
+  # Ensure you have Python 3.11 or later
   python3 --version
   
   # Install via Homebrew if needed
-  brew install python@3.10
+  brew install python@3.11
   ```
 
 - **Permission denied when running AceForge.sh**:
@@ -262,7 +262,7 @@ Or manually trigger the build:
 ### Manual Build (Local)
 
 Requirements:
-- macOS system with Python 3.10+
+- macOS system with Python 3.11+
 - All dependencies installed (`requirements_ace_macos.txt`)
 
 Steps:
