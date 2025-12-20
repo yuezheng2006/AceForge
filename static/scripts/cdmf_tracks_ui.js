@@ -118,7 +118,7 @@
       });
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks/meta HTTP " + resp.status
+          "[Ace Forge] /tracks/meta HTTP " + resp.status
         );
         return;
       }
@@ -165,7 +165,7 @@
       });
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks/meta HTTP " + resp.status
+          "[Ace Forge] /tracks/meta HTTP " + resp.status
         );
         return;
       }
@@ -237,7 +237,7 @@
       });
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks/delete HTTP " + resp.status
+          "[Ace Forge] /tracks/delete HTTP " + resp.status
         );
         return;
       }
@@ -259,7 +259,7 @@
       );
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks/meta GET HTTP " +
+          "[Ace Forge] /tracks/meta GET HTTP " +
             resp.status
         );
         return;
@@ -267,7 +267,7 @@
       const data = await resp.json();
       if (!data || !data.meta) {
         console.warn(
-          "[Candy Dungeon Music Forge] No meta for track",
+          "[Ace Forge] No meta for track",
           trackName
         );
         return;
@@ -282,7 +282,7 @@
         window.CDMF.applySettingsToForm(meta);
       } else {
         console.warn(
-          "[Candy Dungeon Music Forge] CDMF.applySettingsToForm not available."
+          "[Ace Forge] CDMF.applySettingsToForm not available."
         );
       }
     } catch (err) {
@@ -298,7 +298,7 @@
       );
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks/meta GET HTTP " +
+          "[Ace Forge] /tracks/meta GET HTTP " +
             resp.status
         );
         return;
@@ -306,7 +306,7 @@
       const data = await resp.json();
       if (!data || !data.meta) {
         console.warn(
-          "[Candy Dungeon Music Forge] No meta for track",
+          "[Ace Forge] No meta for track",
           trackName
         );
         return;
@@ -361,7 +361,7 @@
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(jsonText);
         console.log(
-          "[Candy Dungeon Music Forge] Copied recipe JSON to clipboard for",
+          "[Ace Forge] Copied recipe JSON to clipboard for",
           trackName
         );
       } else {
@@ -802,7 +802,7 @@
       });
       if (!resp.ok) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks.json HTTP " +
+          "[Ace Forge] /tracks.json HTTP " +
             resp.status
         );
         return;
@@ -811,7 +811,7 @@
       const data = await resp.json();
       if (!data || !Array.isArray(data.tracks)) {
         console.warn(
-          "[Candy Dungeon Music Forge] /tracks.json payload missing tracks array:",
+          "[Ace Forge] /tracks.json payload missing tracks array:",
           data
         );
         return;

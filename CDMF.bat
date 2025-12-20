@@ -33,15 +33,15 @@
 ::978f952a14a936cc963da21a135fa983
 @echo off
 setlocal
-title Candy Dungeon Music Forge
+title Ace Forge
 color 0b
 
 REM ---------------------------------------------------------------------------
-REM  Candy Dungeon Music Forge - Bootstrap / Launcher (no block () usage)
+REM  Ace Forge - Bootstrap / Launcher (no block () usage)
 REM ---------------------------------------------------------------------------
 
 echo ---------------------------------------------
-echo  Candy Dungeon Music Forge - Server Console
+echo  Ace Forge - Server Console
 echo  This window must stay open while CDMF runs.
 echo  Press Ctrl+C to stop the server.
 echo ---------------------------------------------
