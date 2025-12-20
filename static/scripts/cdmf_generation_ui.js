@@ -69,7 +69,7 @@
       try {
         if (window.candyIsGenerating) {
           console.log(
-            "[Candy Dungeon Music Forge] Suppressed play() during generation."
+            "[Ace Forge] Suppressed play() during generation."
           );
           return Promise.resolve();
         }
@@ -455,7 +455,7 @@
       }
     } catch (e) {
       console.warn(
-        "[Candy Dungeon Music Forge] Failed to sync audio2audio flag:",
+        "[Ace Forge] Failed to sync audio2audio flag:",
         e
       );
     }
@@ -480,7 +480,7 @@
       }
     } catch (e) {
       console.warn(
-        "[Candy Dungeon Music Forge] Failed to prepare seed:",
+        "[Ace Forge] Failed to prepare seed:",
         e
       );
     }
@@ -523,7 +523,7 @@
       }
     } catch (e) {
       console.warn(
-        "[Candy Dungeon Music Forge] Failed to reset iframe audio:",
+        "[Ace Forge] Failed to reset iframe audio:",
         e
       );
     }
@@ -841,7 +841,7 @@
       CDMF.closeAutoPromptLyricsModal();
     } catch (err) {
       console.error(
-        "[Candy Dungeon Music Forge] Auto prompt/lyrics error:",
+        "[Ace Forge] Auto prompt/lyrics error:",
         err
       );
       alert(

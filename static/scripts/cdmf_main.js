@@ -175,7 +175,7 @@
       }
     } catch (e) {
       console.warn(
-        "[Candy Dungeon Music Forge] Failed to init knob tabs:",
+        "[Ace Forge] Failed to init knob tabs:",
         e
       );
     }
@@ -213,7 +213,7 @@
       }
     } catch (e) {
       console.error(
-        "[Candy Dungeon Music Forge] Model status init error:",
+        "[Ace Forge] Model status init error:",
         e
       );
     }
@@ -247,7 +247,7 @@
         CDMF.refreshUserPresets();
       }
     } catch (e) {
-      console.error("[Candy Dungeon Music Forge] Init error:", e);
+      console.error("[Ace Forge] Init error:", e);
     }
 
     // Training pause / resume / cancel controls
@@ -255,7 +255,7 @@
       initTrainingControls();
     } catch (e) {
       console.error(
-        "[Candy Dungeon Music Forge] Training controls init error:",
+        "[Ace Forge] Training controls init error:",
         e
       );
     }

@@ -306,7 +306,7 @@ Issues and PRs welcome. If you’re changing anything related to training, model
 This project’s **source code** is licensed under the **Apache License 2.0**. See `LICENSE`.
 ## Trademarks
 
-This project was originally forked from a project with trademarked branding ("Candy Dungeon"). All such trademarked names and branding have been removed from this fork to comply with trademark regulations. This project is now known as "AceForge".
+This project was originally forked from a project with trademarked branding ("Candy Dungeon" and "Candy Dungeon Music Forge"). All such trademarked names and branding have been removed from this fork to comply with trademark regulations. This project is now known as "AceForge".
 
 ## Support
 
