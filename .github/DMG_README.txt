@@ -20,12 +20,6 @@ Installation:
    - Click "Open Anyway" if prompted
    - This is normal for apps downloaded from the internet
 
-Alternative Launch Methods:
----------------------------
-You can also use "AceForge.command" if you prefer, but it's no longer
-necessary. Just double-clicking AceForge.app will now open Terminal
-automatically.
-
 System Requirements:
 -------------------
 - macOS 12.0 (Monterey) or later

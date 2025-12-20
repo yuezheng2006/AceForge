@@ -15,13 +15,11 @@ if [ ! -f "$LAUNCH_SCRIPT" ]; then
     exit 1
 fi
 
-# Escape the directory path for safe use in AppleScript
-# Replace single quotes with '\'' to properly escape them
-ESCAPED_DIR="${SCRIPT_DIR//\'/\'\\\'\'}"
-
-# Open Terminal.app and run the launch script
-# The script will stay open because launch_in_terminal.sh has a read at the end
-osascript -e "tell application \"Terminal\"
-    do script \"cd '$ESCAPED_DIR' && exec './launch_in_terminal.sh'\"
+# Use heredoc to safely pass the directory path to AppleScript
+# This avoids issues with special characters in paths
+osascript <<EOF
+tell application "Terminal"
+    do script "cd $(printf %q "$SCRIPT_DIR") && exec './launch_in_terminal.sh'"
     activate
-end tell"
+end tell
+EOF
