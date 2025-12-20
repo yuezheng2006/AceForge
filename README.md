@@ -61,9 +61,8 @@ Pre-built macOS application bundles are available from the [Releases page](https
 **Note:** On first launch, macOS may show a security warning. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet.
 
 **Alternative:** You can also double-click `AceForge.command` if it's included in the DMG, but it's no longer necessary.
-- To stop: Use the "Exit" button in the web interface
 
-**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window (Method A) or in the Console Panel in the web interface.
+**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
 
 ### Option 2: Run from Source
 

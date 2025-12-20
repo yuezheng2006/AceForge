@@ -64,7 +64,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AceForge_bin',  # Rename binary to AceForge_bin
+    # Binary renamed to AceForge_bin (not AceForge) because:
+    # - The main "AceForge" executable is the wrapper script (macos_terminal_launcher.sh)
+    # - The wrapper opens Terminal.app and then runs launch_in_terminal.sh
+    # - launch_in_terminal.sh executes this binary (AceForge_bin)
+    # This architecture allows the app to launch in Terminal with visible logs
+    name='AceForge_bin',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -9,6 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # The AceForge binary is in the same directory as this script
 # when running from the app bundle (Contents/MacOS/)
+# NOTE: The binary is named AceForge_bin (not AceForge) because the
+# main "AceForge" executable is the wrapper script that launches Terminal.
+# This naming scheme is coordinated with CDMF.spec and macos_terminal_launcher.sh
 EXEC_PATH="${SCRIPT_DIR}/AceForge_bin"
 
 clear
