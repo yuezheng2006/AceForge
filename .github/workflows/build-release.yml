@@ -61,6 +61,10 @@ jobs:
         cp launch_in_terminal.sh dist/AceForge.app/Contents/MacOS/
         chmod +x dist/AceForge.app/Contents/MacOS/launch_in_terminal.sh
         
+        # Copy and set up the terminal launcher wrapper as the main "AceForge" executable
+        cp macos_terminal_launcher.sh dist/AceForge.app/Contents/MacOS/AceForge
+        chmod +x dist/AceForge.app/Contents/MacOS/AceForge
+        
     - name: Create DMG (macOS disk image)
       run: |
         # Create a temporary directory for DMG contents

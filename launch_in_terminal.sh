@@ -7,14 +7,14 @@
 # Get the directory where this script lives
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Determine if we're in an app bundle or source directory
-if [[ "$SCRIPT_DIR" == *"/Contents/MacOS"* ]]; then
-    # Running from app bundle
-    EXEC_PATH="${SCRIPT_DIR}/AceForge"
-else
-    # This shouldn't happen for bundled app, but handle it anyway
-    EXEC_PATH="${SCRIPT_DIR}/AceForge"
-fi
+# The AceForge binary is in the same directory as this script
+# when running from the app bundle (Contents/MacOS/)
+# NOTE: The binary is named AceForge_bin (not AceForge) because:
+# - macos_terminal_launcher.sh is copied as the main "AceForge" executable in Contents/MacOS/
+# - The wrapper uses AppleScript to open Terminal.app and execute this script
+# - This script then executes the actual PyInstaller binary (AceForge_bin)
+# This naming scheme is coordinated with CDMF.spec and macos_terminal_launcher.sh
+EXEC_PATH="${SCRIPT_DIR}/AceForge_bin"
 
 clear
 

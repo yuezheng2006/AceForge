@@ -64,7 +64,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='AceForge',
+    # Binary renamed to AceForge_bin (not AceForge) because:
+    # - The main "AceForge" executable is the wrapper script (macos_terminal_launcher.sh)
+    # - The wrapper opens Terminal.app and then runs launch_in_terminal.sh
+    # - launch_in_terminal.sh executes this binary (AceForge_bin)
+    # This architecture allows the app to launch in Terminal with visible logs
+    name='AceForge_bin',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -85,7 +90,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='AceForge',
+    name='AceForge',  # Collection name stays as AceForge
 )
 
 # macOS app bundle
@@ -102,8 +107,11 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSRequiresAquaSystemAppearance': False,
-        # Launch in Terminal to keep console visible
-        'LSUIElement': False,  # Show in dock
-        'LSBackgroundOnly': False,  # Run in foreground
+        # Show in dock and run in foreground
+        'LSUIElement': False,
+        'LSBackgroundOnly': False,
+        'CFBundlePackageType': 'APPL',
+        # The main executable will be the wrapper script added by build workflow
+        'CFBundleExecutable': 'AceForge',
     },
 )
