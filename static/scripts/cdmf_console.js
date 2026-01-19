@@ -193,6 +193,104 @@
   window.CDMF.toggleConsole = toggleConsole;
   window.CDMF.initConsole = initConsole;
 
+  // Settings panel functions
+  let settingsExpanded = false;
+
+  window.CDMF.toggleSettings = function() {
+    const settingsPanel = document.getElementById('settingsPanel');
+    const toggleIcon = document.getElementById('settingsToggleIcon');
+    
+    if (!settingsPanel || !toggleIcon) return;
+
+    settingsExpanded = !settingsExpanded;
+
+    if (settingsExpanded) {
+      settingsPanel.style.display = 'block';
+      toggleIcon.textContent = '▼';
+      // Load current models folder when opening
+      window.CDMF.loadModelsFolder();
+    } else {
+      settingsPanel.style.display = 'none';
+      toggleIcon.textContent = '▶';
+    }
+  };
+
+  window.CDMF.loadModelsFolder = async function() {
+    const input = document.getElementById('modelsFolderInput');
+    const status = document.getElementById('modelsFolderStatus');
+    
+    if (!input || !status) return;
+
+    try {
+      const response = await fetch('/models/folder');
+      const data = await response.json();
+      
+      if (data.ok) {
+        input.value = data.models_folder || '';
+        status.textContent = 'Current: ' + (data.models_folder || '(default)');
+        status.style.display = 'block';
+        status.style.color = '#10b981';
+      } else {
+        status.textContent = 'Failed to load current folder';
+        status.style.display = 'block';
+        status.style.color = '#ef4444';
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to load models folder:', error);
+      status.textContent = 'Error: ' + error.message;
+      status.style.display = 'block';
+      status.style.color = '#ef4444';
+    }
+  };
+
+  window.CDMF.saveModelsFolder = async function() {
+    const input = document.getElementById('modelsFolderInput');
+    const status = document.getElementById('modelsFolderStatus');
+    
+    if (!input || !status) return;
+
+    const newPath = input.value.trim();
+    if (!newPath) {
+      status.textContent = 'Please enter a valid path';
+      status.style.display = 'block';
+      status.style.color = '#ef4444';
+      return;
+    }
+
+    status.textContent = 'Saving...';
+    status.style.display = 'block';
+    status.style.color = '#3b82f6';
+
+    try {
+      const response = await fetch('/models/folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ path: newPath })
+      });
+      
+      const data = await response.json();
+      
+      if (data.ok) {
+        status.textContent = 'Saved! ' + (data.message || 'Restart the application for changes to take effect.');
+        status.style.color = '#10b981';
+        
+        // Update input to show normalized path
+        if (data.models_folder) {
+          input.value = data.models_folder;
+        }
+      } else {
+        status.textContent = 'Error: ' + (data.error || 'Failed to save');
+        status.style.color = '#ef4444';
+      }
+    } catch (error) {
+      console.error('[Settings] Failed to save models folder:', error);
+      status.textContent = 'Error: ' + error.message;
+      status.style.color = '#ef4444';
+    }
+  };
+
   // Initialize when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initConsole);

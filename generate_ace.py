@@ -141,7 +141,7 @@ except Exception as _ta_err:
     # in which case you'll still see the torchcodec error.
     pass
 
-# ACE-Step Python API (installed via `pip install "ace-step[gui]"`)
+# ACE-Step pipeline (using cdmf_pipeline_ace_step.py)
 _ACE_IMPORT_ERROR = None  # <-- MUST exist before the try
 
 try:
@@ -154,6 +154,8 @@ except Exception as e:  # import-time diagnostics only
 #  Basic config
 # -----------------------------------------------------------------------------
 
+import cdmf_paths
+
 # Default target length + fades (UI can override)
 DEFAULT_TARGET_SECONDS = 150.0
 DEFAULT_FADE_IN_SECONDS = 0.5
@@ -162,8 +164,8 @@ DEFAULT_FADE_OUT_SECONDS = 0.5
 # Where this script lives
 APP_DIR = Path(__file__).parent.resolve()
 
-# Force Hugging Face cache into a local folder next to this script
-HF_HOME = APP_DIR / "ace_models"
+# Force Hugging Face cache into the configured models folder
+HF_HOME = cdmf_paths.get_models_folder()
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 
 # Default output root if none is explicitly provided
@@ -176,10 +178,10 @@ INPUT_PARAMS_SUBDIR_NAME = "input_params_record"
 # If you decide to call a local ACE-Step repo via infer-api.py instead of
 # importing its Python API, you can point to it here:
 ACE_STEP_REPO_DIR = Path(os.environ.get("ACE_STEP_REPO_DIR", APP_DIR / "ACE-Step")).resolve()
-# Force ACE-Step to look for checkpoints inside the packaged directory
+# Force ACE-Step to look for checkpoints inside the configured models folder
 os.environ.setdefault(
     "ACE_STEP_CACHE_DIR",
-    str(Path(APP_DIR, "ace_models").resolve())
+    str(cdmf_paths.get_models_folder().resolve())
 )
 
 # -----------------------------------------------------------------------------
@@ -336,9 +338,10 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
 
     if ACEStepPipeline is None:
         raise RuntimeError(
-            "ace-step is not available in this environment.\n\n"
-            "Make sure you've installed it inside this venv, e.g.:\n"
-            '  pip install "ace-step[gui]"\n\n'
+            "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
+            "This usually means required dependencies are missing.\n"
+            "Make sure you've installed all dependencies from requirements_ace.txt:\n"
+            '  pip install -r requirements_ace.txt\n\n'
             f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
         )
 

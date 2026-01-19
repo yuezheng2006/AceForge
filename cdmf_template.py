@@ -59,6 +59,43 @@ HTML = r"""
       </div>
     </div>
 
+    <!-- Settings panel (collapsible) -->
+    <div class="card" id="settingsCard">
+      <div class="card-header-row" style="cursor:pointer;" onclick="CDMF.toggleSettings && CDMF.toggleSettings()">
+        <h2 style="margin:0;">
+          <span id="settingsToggleIcon">▶</span> Settings
+        </h2>
+        <span class="small" style="opacity:0.7;">
+          Click to expand/collapse
+        </span>
+      </div>
+      <div id="settingsPanel" style="display:none;">
+        <div class="row">
+          <label for="modelsFolderInput">Models Folder</label>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0;">
+            <div style="display:flex;gap:8px;align-items:center;min-width:0;">
+              <input
+                type="text"
+                id="modelsFolderInput"
+                placeholder="Path to models folder"
+                style="flex:1;min-width:0;">
+              <button type="button" class="btn secondary" onclick="CDMF.loadModelsFolder && CDMF.loadModelsFolder()">
+                Load Current
+              </button>
+              <button type="button" class="btn" onclick="CDMF.saveModelsFolder && CDMF.saveModelsFolder()">
+                Save
+              </button>
+            </div>
+            <div class="small" style="opacity:0.7;">
+              Specify where to store downloaded models. Changes take effect on next restart.
+              Leave empty to use default (<code>ace_models/</code> in the application directory).
+            </div>
+            <div id="modelsFolderStatus" class="small" style="display:none;margin-top:4px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Music player card -->
     <div class="card">
       <div class="card-header-row">

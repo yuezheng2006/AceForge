@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import threading
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from ace_model_setup import ensure_ace_models, ace_models_present
 import cdmf_state
+import cdmf_paths
 
 
 def _download_models_worker() -> None:
@@ -113,5 +114,37 @@ def create_models_blueprint() -> Blueprint:
 
         threading.Thread(target=_download_models_worker, daemon=True).start()
         return jsonify({"ok": True, "started": True})
+
+    @bp.route("/models/folder", methods=["GET"])
+    def models_folder_get():
+        """
+        Get the current models folder configuration.
+        """
+        models_folder = str(cdmf_paths.get_models_folder())
+        return jsonify({"ok": True, "models_folder": models_folder})
+
+    @bp.route("/models/folder", methods=["POST"])
+    def models_folder_set():
+        """
+        Set the models folder path.
+        """
+        data = request.get_json() or {}
+        new_path = data.get("path", "").strip()
+        
+        if not new_path:
+            return jsonify({"ok": False, "error": "Path cannot be empty"}), 400
+        
+        success = cdmf_paths.set_models_folder(new_path)
+        if success:
+            return jsonify({
+                "ok": True, 
+                "models_folder": str(cdmf_paths.get_models_folder()),
+                "message": "Models folder updated successfully. Restart the application for changes to take full effect."
+            })
+        else:
+            return jsonify({
+                "ok": False, 
+                "error": "Failed to set models folder. Check that the path is valid and writable."
+            }), 400
 
     return bp
