@@ -12,6 +12,11 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAUNCH_SCRIPT="${SCRIPT_DIR}/launch_in_terminal.sh"
 
+# Configuration for process monitoring
+PROCESS_NAME="AceForge_bin"
+POLL_INTERVAL=3  # seconds between process checks
+STARTUP_TIMEOUT=10  # seconds to wait for process to start (enough for PyInstaller bootloader + Python initialization)
+
 # Check if launch script exists
 if [ ! -f "$LAUNCH_SCRIPT" ]; then
     echo "Error: launch_in_terminal.sh not found at $LAUNCH_SCRIPT"
@@ -40,20 +45,20 @@ EOF
 sleep 2
 
 # Keep this process alive to maintain app visibility in the dock
-# We monitor the AceForge_bin process and exit when it's done
+# We monitor the server process and exit when it's done
 while [ -f "$MARKER_FILE" ]; do
-    # Check if AceForge_bin is running
-    if pgrep -f "AceForge_bin" > /dev/null 2>&1; then
+    # Check if the server process is running
+    if pgrep -f "$PROCESS_NAME" > /dev/null 2>&1; then
         # Process is running, continue waiting
-        sleep 3
+        sleep $POLL_INTERVAL
     else
         # Process not found - check if it's still starting up or has finished
         # Wait a bit longer to distinguish between "not started yet" and "finished"
-        sleep 3
-        if ! pgrep -f "AceForge_bin" > /dev/null 2>&1; then
+        sleep $POLL_INTERVAL
+        if ! pgrep -f "$PROCESS_NAME" > /dev/null 2>&1; then
             # Still not running after grace period - it likely finished or failed
-            # Check if we've been running for at least 10 seconds (enough for startup)
-            if [ $SECONDS -gt 10 ]; then
+            # Check if we've been running long enough for startup
+            if [ $SECONDS -gt $STARTUP_TIMEOUT ]; then
                 # We've been running long enough, process has ended
                 break
             fi
