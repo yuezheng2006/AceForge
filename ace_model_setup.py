@@ -5,19 +5,24 @@ import sys
 from typing import Optional, Callable
 
 from huggingface_hub import snapshot_download
+import cdmf_paths
 
 # Hugging Face repo for ACE-Step
 ACE_REPO_ID = "ACE-Step/ACE-Step-v1-3.5B"
 
-# Root folder we use as Hugging Face "cache_dir" for ACE-Step.
-# This will contain the usual HF layout:
-#   ace_models/checkpoints/
-#     blobs/
-#     models--ACE-Step--ACE-Step-v1-3.5B/
-#       snapshots/<rev-hash>/
-ACE_CHECKPOINT_ROOT = (
-    Path(__file__).resolve().parent / "ace_models" / "checkpoints"
-)
+def get_ace_checkpoint_root() -> Path:
+    """
+    Get the root folder for ACE-Step checkpoints based on user configuration.
+    This will contain the usual HF layout:
+      <models_folder>/checkpoints/
+        blobs/
+        models--ACE-Step--ACE-Step-v1-3.5B/
+          snapshots/<rev-hash>/
+    """
+    models_folder = cdmf_paths.get_models_folder()
+    checkpoint_root = models_folder / "checkpoints"
+    checkpoint_root.mkdir(parents=True, exist_ok=True)
+    return checkpoint_root
 
 # Name HF uses for the repo under the cache root
 ACE_LOCAL_DIRNAME = "models--ACE-Step--ACE-Step-v1-3.5B"
@@ -60,18 +65,19 @@ def _build_tqdm_with_progress_cb(progress_cb: ProgressCallback):
 def _ace_repo_dir() -> Path:
     """
     Directory where Hugging Face will place the ACE-Step repo
-    under our ACE_CHECKPOINT_ROOT.
+    under our checkpoint root.
     """
-    return ACE_CHECKPOINT_ROOT / ACE_LOCAL_DIRNAME
+    checkpoint_root = get_ace_checkpoint_root()
+    return checkpoint_root / ACE_LOCAL_DIRNAME
 
 
 def ace_models_present() -> bool:
     """
     Lightweight check: treat the model as present if we can find at least
-    one *.safetensors weight file anywhere under ACE_CHECKPOINT_ROOT,
+    one *.safetensors weight file anywhere under the checkpoint root,
     without triggering any network downloads.
     """
-    root = ACE_CHECKPOINT_ROOT
+    root = get_ace_checkpoint_root()
     if not root.is_dir():
         return False
 
@@ -87,16 +93,17 @@ def ace_models_present() -> bool:
     return False
 
 
-def ensure_ace_models(progress_cb: Optional[ProgressCallback] = None) -> Path:
+def ensure_ace_models(progress_cb: Optional[Callable[[float], None]] = None) -> Path:
     """
-    Ensure the ACE-Step model is present under ace_models/checkpoints.
+    Ensure the ACE-Step model is present under <models_folder>/checkpoints.
     Returns the path to the repo dir:
-      ace_models/checkpoints/models--ACE-Step--ACE-Step-v1-3.5B
+      <models_folder>/checkpoints/models--ACE-Step--ACE-Step-v1-3.5B
 
     If `progress_cb` is provided, it will be called with a float in [0, 1]
     reflecting approximate snapshot_download progress.
     """
-    target_dir = ACE_CHECKPOINT_ROOT / ACE_LOCAL_DIRNAME
+    checkpoint_root = get_ace_checkpoint_root()
+    target_dir = checkpoint_root / ACE_LOCAL_DIRNAME
 
     # If it's already there and non-empty, we're done.
     if target_dir.is_dir() and any(target_dir.iterdir()):

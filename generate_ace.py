@@ -141,7 +141,7 @@ except Exception as _ta_err:
     # in which case you'll still see the torchcodec error.
     pass
 
-# ACE-Step Python API (installed via `pip install "ace-step[gui]"`)
+# ACE-Step pipeline (using cdmf_pipeline_ace_step.py)
 _ACE_IMPORT_ERROR = None  # <-- MUST exist before the try
 
 try:
@@ -154,6 +154,8 @@ except Exception as e:  # import-time diagnostics only
 #  Basic config
 # -----------------------------------------------------------------------------
 
+import cdmf_paths
+
 # Default target length + fades (UI can override)
 DEFAULT_TARGET_SECONDS = 150.0
 DEFAULT_FADE_IN_SECONDS = 0.5
@@ -162,8 +164,8 @@ DEFAULT_FADE_OUT_SECONDS = 0.5
 # Where this script lives
 APP_DIR = Path(__file__).parent.resolve()
 
-# Force Hugging Face cache into a local folder next to this script
-HF_HOME = APP_DIR / "ace_models"
+# Force Hugging Face cache into the configured models folder
+HF_HOME = cdmf_paths.get_models_folder()
 os.environ.setdefault("HF_HOME", str(HF_HOME))
 
 # Default output root if none is explicitly provided
@@ -176,10 +178,10 @@ INPUT_PARAMS_SUBDIR_NAME = "input_params_record"
 # If you decide to call a local ACE-Step repo via infer-api.py instead of
 # importing its Python API, you can point to it here:
 ACE_STEP_REPO_DIR = Path(os.environ.get("ACE_STEP_REPO_DIR", APP_DIR / "ACE-Step")).resolve()
-# Force ACE-Step to look for checkpoints inside the packaged directory
+# Force ACE-Step to look for checkpoints inside the configured models folder
 os.environ.setdefault(
     "ACE_STEP_CACHE_DIR",
-    str(Path(APP_DIR, "ace_models").resolve())
+    str(cdmf_paths.get_models_folder().resolve())
 )
 
 # -----------------------------------------------------------------------------
@@ -335,12 +337,35 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
         return _ACE_PIPELINE
 
     if ACEStepPipeline is None:
-        raise RuntimeError(
-            "ace-step is not available in this environment.\n\n"
-            "Make sure you've installed it inside this venv, e.g.:\n"
-            '  pip install "ace-step[gui]"\n\n'
-            f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
-        )
+        # Check if running as frozen app (macOS .app bundle)
+        is_frozen = getattr(sys, 'frozen', False)
+        
+        if is_frozen:
+            # For frozen app, acestep should already be bundled
+            error_msg = (
+                "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
+                "This is unexpected in a frozen app bundle - the ace-step package\n"
+                "should have been bundled during the build process.\n\n"
+                "Possible causes:\n"
+                "- The app bundle was built without ace-step installed\n"
+                "- A dependency is missing or incompatible\n\n"
+                "Try downloading a fresh copy of AceForge from:\n"
+                "  https://github.com/audiohacking/AceForge/releases\n\n"
+                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+            )
+        else:
+            # For running from source
+            error_msg = (
+                "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
+                "This usually means the ace-step package is not installed.\n"
+                "ACE-Step must be installed from GitHub (not PyPI) using:\n"
+                '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
+                "Or run the setup using the launcher script (CDMF.sh / CDMF.bat) which\n"
+                "will handle all dependencies automatically.\n\n"
+                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+            )
+        
+        raise RuntimeError(error_msg)
 
     with _ACE_PIPELINE_LOCK:
         if _ACE_PIPELINE is not None:

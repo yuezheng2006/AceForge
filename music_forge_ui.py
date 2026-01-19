@@ -8,6 +8,7 @@ import os
 import threading
 import queue
 import logging
+import time
 from io import StringIO
 
 from flask import Flask, Response, request
@@ -324,4 +325,27 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        error_msg = (
+            "[AceForge] FATAL ERROR during startup:\n"
+            f"{traceback.format_exc()}\n"
+            "\n"
+            "The application will now exit.\n"
+            "Please check the error message above for details."
+        )
+        print(error_msg, flush=True)
+        
+        # Log to a file if possible
+        try:
+            error_log = Path(__file__).parent / "error.log"
+            with error_log.open("a", encoding="utf-8") as f:
+                f.write(f"\n\n{'='*80}\n")
+                f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]\n")
+                f.write(error_msg)
+        except Exception:
+            pass
+        
+        sys.exit(1)
