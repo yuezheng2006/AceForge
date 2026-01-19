@@ -337,15 +337,35 @@ def _get_ace_pipeline() -> "ACEStepPipeline":
         return _ACE_PIPELINE
 
     if ACEStepPipeline is None:
-        raise RuntimeError(
-            "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
-            "This usually means the ace-step package is not installed.\n"
-            "ACE-Step must be installed from GitHub (not PyPI) using:\n"
-            '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
-            "Or run the setup using the launcher script (CDMF.sh / CDMF.bat) which\n"
-            "will handle all dependencies automatically.\n\n"
-            f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
-        )
+        # Check if running as frozen app (macOS .app bundle)
+        is_frozen = getattr(sys, 'frozen', False)
+        
+        if is_frozen:
+            # For frozen app, acestep should already be bundled
+            error_msg = (
+                "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
+                "This is unexpected in a frozen app bundle - the ace-step package\n"
+                "should have been bundled during the build process.\n\n"
+                "Possible causes:\n"
+                "- The app bundle was built without ace-step installed\n"
+                "- A dependency is missing or incompatible\n\n"
+                "Try downloading a fresh copy of AceForge from:\n"
+                "  https://github.com/audiohacking/AceForge/releases\n\n"
+                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+            )
+        else:
+            # For running from source
+            error_msg = (
+                "ACEStepPipeline could not be imported from cdmf_pipeline_ace_step.py.\n\n"
+                "This usually means the ace-step package is not installed.\n"
+                "ACE-Step must be installed from GitHub (not PyPI) using:\n"
+                '  pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps\n\n'
+                "Or run the setup using the launcher script (CDMF.sh / CDMF.bat) which\n"
+                "will handle all dependencies automatically.\n\n"
+                f"Original import error:\n{_ACE_IMPORT_ERROR!r}"
+            )
+        
+        raise RuntimeError(error_msg)
 
     with _ACE_PIPELINE_LOCK:
         if _ACE_PIPELINE is not None:
