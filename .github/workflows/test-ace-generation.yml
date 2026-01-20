@@ -106,6 +106,7 @@ jobs:
         python -c "
         from pathlib import Path
         import sys
+        from ace_model_setup import ACE_LOCAL_DIRNAME
         
         # Check if models directory exists
         models_dir = Path('ace_models/checkpoints')
@@ -113,8 +114,8 @@ jobs:
             print('✗ Models directory does not exist')
             sys.exit(1)
             
-        # Find the downloaded model repo directory (HF uses models--org--repo format)
-        ace_repo_dir = models_dir / 'models--ACE-Step--ACE-Step-v1-3.5B'
+        # Find the downloaded model repo directory (using ACE_LOCAL_DIRNAME from ace_model_setup.py)
+        ace_repo_dir = models_dir / ACE_LOCAL_DIRNAME
         if not ace_repo_dir.exists():
             print(f'✗ ACE-Step model directory not found at {ace_repo_dir}')
             sys.exit(1)
