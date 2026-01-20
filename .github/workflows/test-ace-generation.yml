@@ -113,15 +113,23 @@ jobs:
             print('✗ Models directory does not exist')
             sys.exit(1)
             
-        # Check for required model subdirectories
+        # Find the downloaded model repo directory (HF uses models--org--repo format)
+        ace_repo_dir = models_dir / 'models--ACE-Step--ACE-Step-v1-3.5B'
+        if not ace_repo_dir.exists():
+            print(f'✗ ACE-Step model directory not found at {ace_repo_dir}')
+            sys.exit(1)
+        
+        print(f'✓ Found ACE-Step model directory: {ace_repo_dir}')
+        
+        # Check for required model subdirectories inside the repo directory
         required_dirs = ['music_dcae_f8c8', 'music_vocoder', 'ace_step_transformer', 'umt5-base']
         all_exist = True
         for dir_name in required_dirs:
-            dir_path = models_dir / dir_name
+            dir_path = ace_repo_dir / dir_name
             if dir_path.exists():
                 print(f'✓ {dir_name} directory exists')
             else:
-                print(f'✗ {dir_name} directory missing')
+                print(f'✗ {dir_name} directory missing in {ace_repo_dir}')
                 all_exist = False
         
         if not all_exist:
