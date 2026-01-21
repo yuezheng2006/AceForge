@@ -58,6 +58,12 @@ Pre-built macOS application bundles are available from the [Releases page](https
 - Keep the Terminal window open while using AceForge
 - To stop: Press Ctrl+C in Terminal or use the "Exit" button in the browser
 
+If OSX complains about AceForge being corrupted on first usage, open the terminal and run this command:
+
+```
+sudo xattr -cr /Applications/AceForge.app
+```
+
 **Note:** On first launch, macOS may show a security warning. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet.
 
 **Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
@@ -119,19 +125,6 @@ A console window (“server console”) appears and **must stay open** while Ace
 5. (Optional) Build a dataset and train a LoRA in **Training**
 6. **To Exit**: Click the "Exit" button in the top-right corner or press Ctrl+C in the terminal
 
-### New UI Features
-
-**Server Console Panel** (v0.1+)
-- Click "▼ Server Console" at the top of the page to expand/collapse
-- View real-time server logs directly in the browser
-- Useful for troubleshooting errors and monitoring model downloads
-- Logs are displayed in a terminal-style interface with auto-scrolling
-
-**Exit Button** (v0.1+)
-- Located in the top-right corner of the UI
-- Gracefully shuts down the AceForge server
-- Closes all services and terminates the backend
-- Safe to use instead of force-closing the terminal window
 
 ## Generation basics
 
@@ -236,36 +229,6 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 - **Batch sizes**: Start with smaller batch sizes and gradually increase to find optimal performance
 - **Model precision**: The pipeline automatically selects appropriate precision for MPS (float32 instead of bfloat16)
 - **Generation length**: Longer generation times may require more memory; start with shorter durations and scale up
-
-## About This Fork
-
-This is a **macOS-optimized** version specifically designed for Apple Metal (MPS) GPU acceleration. This fork focuses exclusively on macOS support and does not maintain Windows compatibility.
-
-### Differences from Original
-
-- **Apple Metal (MPS) GPU support**: Optimized for Apple Silicon and Intel Macs with AMD GPUs
-- **Device-agnostic code**: Automatic device selection (MPS → CPU fallback)
-- **macOS launcher**: Native bash script (`CDMF.sh`) instead of Windows batch file
-- **Unified memory optimizations**: Leverages Apple Silicon's unified memory architecture
-- **macOS-specific dependencies**: Windows-specific packages removed
-
-### Porting Updates from Upstream
-
-To port updates from the original Windows version:
-
-1. The original Windows requirements are preserved in `requirements_ace_windows_reference.txt`
-2. The original Windows launcher is in `AceForge.bat`
-3. When merging updates, focus on:
-   - Core model and pipeline logic
-   - UI and generation features
-   - Dataset and training functionality
-4. Adapt any Windows-specific or CUDA-only code to be device-agnostic
-5. Test thoroughly with MPS backend
-
-Key files for cross-platform compatibility:
-- `cdmf_pipeline_ace_step.py` - Device selection and memory management
-- `cdmf_trainer.py` - Training with device-agnostic autocast
-- `music_forge_ui.py` - Browser opening logic
 
 ## Building Releases
 
