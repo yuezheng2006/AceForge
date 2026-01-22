@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import json
 import os
+import platform
 
 # ---------------------------------------------------------------------------
 # Core paths and directories (shared across modules)
@@ -16,8 +17,36 @@ if getattr(sys, "frozen", False):
 else:
     APP_DIR = Path(__file__).parent.resolve()
 
+def get_user_preferences_dir() -> Path:
+    """
+    Get the user preferences directory following platform conventions.
+    - macOS: ~/Library/Preferences/com.audiohacking.AceForge/
+    - Windows/Linux: APP_DIR (fallback to app directory)
+    """
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        pref_dir = Path.home() / "Library" / "Preferences" / "com.audiohacking.AceForge"
+        pref_dir.mkdir(parents=True, exist_ok=True)
+        return pref_dir
+    # Fallback for Windows/Linux: use app directory
+    return APP_DIR
+
+def get_user_data_dir() -> Path:
+    """
+    Get the user data directory following platform conventions.
+    - macOS: ~/Library/Application Support/AceForge/
+    - Windows/Linux: APP_DIR (fallback to app directory)
+    """
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        data_dir = Path.home() / "Library" / "Application Support" / "AceForge"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir
+    # Fallback for Windows/Linux: use app directory
+    return APP_DIR
+
 # Configuration file for user settings
-CONFIG_PATH = APP_DIR / "aceforge_config.json"
+CONFIG_PATH = get_user_preferences_dir() / "aceforge_config.json"
 
 def load_config() -> dict:
     """Load configuration from aceforge_config.json or return defaults."""
@@ -39,7 +68,11 @@ def save_config(config: dict) -> None:
         print(f"[AceForge] Warning: Failed to save config: {e}", flush=True)
 
 def get_models_folder() -> Path:
-    """Get the configured models folder path, or default to APP_DIR / ace_models."""
+    """
+    Get the configured models folder path, or default based on platform:
+    - macOS: ~/Library/Application Support/AceForge/models/
+    - Windows/Linux: APP_DIR / ace_models
+    """
     config = load_config()
     models_path = config.get("models_folder")
     if models_path:
@@ -52,8 +85,14 @@ def get_models_folder() -> Path:
             print(f"[AceForge] Warning: Cannot use configured models folder {models_path}: {e}", flush=True)
             print("[AceForge] Falling back to default models folder.", flush=True)
     
-    # Default path
-    default_path = APP_DIR / "ace_models"
+    # Default path based on platform
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        default_path = get_user_data_dir() / "models"
+    else:
+        # Windows/Linux: use app directory
+        default_path = APP_DIR / "ace_models"
+    
     default_path.mkdir(parents=True, exist_ok=True)
     return default_path
 
@@ -77,29 +116,60 @@ def set_models_folder(path: str) -> bool:
         return False
 
 # Where finished tracks go
-DEFAULT_OUT_DIR = str(APP_DIR / "generated")
+def _get_default_output_dir() -> Path:
+    """Get default output directory based on platform."""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        output_dir = get_user_data_dir() / "generated"
+    else:
+        output_dir = APP_DIR / "generated"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
 
-# Presets / tracks metadata / user presets
+DEFAULT_OUT_DIR = str(_get_default_output_dir())
+
+# Presets / tracks metadata / user presets  
+# Keep these in APP_DIR as they're bundled with the application
+# User presets go in user data directory
 PRESETS_PATH = APP_DIR / "presets.json"
-TRACK_META_PATH = APP_DIR / "tracks_meta.json"
-USER_PRESETS_PATH = APP_DIR / "user_presets.json"
+TRACK_META_PATH = get_user_data_dir() / "tracks_meta.json" if platform.system() == "Darwin" else APP_DIR / "tracks_meta.json"
+USER_PRESETS_PATH = get_user_data_dir() / "user_presets.json" if platform.system() == "Darwin" else APP_DIR / "user_presets.json"
 
 # Shared location for ACE-Step base model weights used by the LoRA trainer.
-ACE_TRAINER_MODEL_ROOT = APP_DIR / "ace_models"
-ACE_TRAINER_MODEL_ROOT.mkdir(parents=True, exist_ok=True)
+# Use the same location as get_models_folder() for consistency
+ACE_TRAINER_MODEL_ROOT = get_models_folder()
 
 # Root for all ACE-Step training datasets (LoRA + MuFun).
-TRAINING_DATA_ROOT = APP_DIR / "training_datasets"
-TRAINING_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+def _get_training_data_root() -> Path:
+    """Get training data root directory based on platform."""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        training_dir = get_user_data_dir() / "training_datasets"
+    else:
+        training_dir = APP_DIR / "training_datasets"
+    training_dir.mkdir(parents=True, exist_ok=True)
+    return training_dir
+
+TRAINING_DATA_ROOT = _get_training_data_root()
 
 # Training configs (JSON files for LoRA hyperparameters)
+# Keep these in APP_DIR as they're bundled configuration templates
 TRAINING_CONFIG_ROOT = APP_DIR / "training_config"
 TRAINING_CONFIG_ROOT.mkdir(parents=True, exist_ok=True)
 DEFAULT_LORA_CONFIG = TRAINING_CONFIG_ROOT / "default_config.json"
 
 # Where custom LoRA adapters live
-CUSTOM_LORA_ROOT = APP_DIR / "custom_lora"
-CUSTOM_LORA_ROOT.mkdir(parents=True, exist_ok=True)
+def _get_custom_lora_root() -> Path:
+    """Get custom LoRA adapters directory based on platform."""
+    system = platform.system()
+    if system == "Darwin":  # macOS
+        lora_dir = get_user_data_dir() / "custom_lora"
+    else:
+        lora_dir = APP_DIR / "custom_lora"
+    lora_dir.mkdir(parents=True, exist_ok=True)
+    return lora_dir
+
+CUSTOM_LORA_ROOT = _get_custom_lora_root()
 
 # Seed vibes (these should match ACE_VIBE_TAGS in generate_ace.py)
 SEED_VIBES = [
