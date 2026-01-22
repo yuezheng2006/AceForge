@@ -15,13 +15,33 @@ import sys
 # Store import errors for better diagnostics in frozen apps
 _IMPORT_ERRORS = {}
 
-# Basic imports that should always work
-import torch
-from loguru import logger
-from tqdm import tqdm
+# Basic imports that should always work (torch, json, math are standard)
+try:
+    import torch
+except ImportError as e:
+    _IMPORT_ERRORS['torch'] = str(e)
+    torch = None
+
+try:
+    from loguru import logger
+except ImportError as e:
+    _IMPORT_ERRORS['loguru'] = str(e)
+    logger = None
+
+try:
+    from tqdm import tqdm
+except ImportError as e:
+    _IMPORT_ERRORS['tqdm'] = str(e)
+    tqdm = None
+
 import json
 import math
-from huggingface_hub import snapshot_download
+
+try:
+    from huggingface_hub import snapshot_download
+except ImportError as e:
+    _IMPORT_ERRORS['huggingface_hub'] = str(e)
+    snapshot_download = None
 
 # Try to import diffusers and transformers (should be bundled)
 try:
