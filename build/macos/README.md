@@ -78,8 +78,10 @@ For the smoothest user experience:
 
 ```bash
 # After code signing with Developer ID:
+# Replace "YourNotaryProfile" with your keychain profile name
+# (Created via: xcrun notarytool store-credentials)
 xcrun notarytool submit AceForge-macOS.dmg \
-  --keychain-profile "AppPwdNotarizID" \
+  --keychain-profile "YourNotaryProfile" \
   --wait
 
 xcrun stapler staple dist/AceForge.app
@@ -101,9 +103,12 @@ xcrun stapler staple dist/AceForge.app
 security find-identity -v -p codesigning
 
 # Common identity formats:
-# - "Developer ID Application: Company Name (TEAM123)" - For distribution
-# - "Apple Development: Your Name (TEAM123)" - For development
-# - "-" - Ad-hoc signing (no certificate)
+# - "Developer ID Application: Company Name (TEAM123)" 
+#     → For distribution outside the App Store (public release)
+# - "Apple Development: Your Name (TEAM123)" 
+#     → For Xcode development and testing on registered devices
+# - "-" 
+#     → Ad-hoc signing (no certificate, works locally but shows security warning)
 ```
 
 ## Troubleshooting
