@@ -135,5 +135,3 @@ jobs:
           AceForge-macOS.dmg
           AceForge-macOS.zip
           checksums.txt
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
