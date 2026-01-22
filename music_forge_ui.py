@@ -22,8 +22,8 @@ try:
     
     # Force the lazy module to fully initialize if it's a LazyModule
     # This ensures our patches stick in frozen PyInstaller apps
-    # Accessing __dict__ itself triggers the lazy loading mechanism
-    _ = _cdmf_dl.__dict__
+    # Accessing __dict__ triggers the lazy loading mechanism (assignment to trigger side effect)
+    _force_lazy_init = _cdmf_dl.__dict__
 
     # Patch FromSingleFileMixin if not available at top level
     if not hasattr(_cdmf_dl, "FromSingleFileMixin"):
