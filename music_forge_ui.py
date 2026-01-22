@@ -19,13 +19,11 @@ from flask import Flask, Response, request
 
 try:
     import diffusers.loaders as _cdmf_dl  # type: ignore[import]
-    import sys
     
     # Force the lazy module to fully initialize if it's a LazyModule
     # This ensures our patches stick in frozen PyInstaller apps
-    if hasattr(_cdmf_dl, '__dict__'):
-        # Trigger any lazy loading by accessing an attribute
-        _ = getattr(_cdmf_dl, '__name__', None)
+    # Accessing __dict__ itself triggers the lazy loading mechanism
+    _ = _cdmf_dl.__dict__
 
     # Patch FromSingleFileMixin if not available at top level
     if not hasattr(_cdmf_dl, "FromSingleFileMixin"):
