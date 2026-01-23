@@ -74,12 +74,6 @@ def start_flask_server():
         raise
 
 # Event handlers for pywebview window
-def on_before_show(window):
-    """Called before window is shown"""
-    global _window_instance
-    _window_instance = window
-    print("[AceForge] Window about to be shown", flush=True)
-
 def on_closed():
     """Called when window is closed"""
     print("[AceForge] Window closed, exiting...", flush=True)
@@ -88,18 +82,6 @@ def on_closed():
 def on_closing():
     """Called when window is closing"""
     print("[AceForge] Window closing...", flush=True)
-
-def on_initialized(renderer):
-    """Called when GUI is initialized"""
-    print(f"[AceForge] GUI initialized with renderer: {renderer}", flush=True)
-    
-    # CRITICAL: If multiple windows exist, prevent duplicate initialization
-    if len(webview.windows) > 1:
-        print("[AceForge] BLOCKED: Duplicate window initialization detected - canceling", flush=True)
-        return False  # Cancel initialization to prevent duplicate window
-    
-    # Return True to allow initialization
-    return True
 
 def on_shown():
     """Called when window is shown"""
