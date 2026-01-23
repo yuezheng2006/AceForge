@@ -4,8 +4,9 @@
 import sys
 from pathlib import Path
 
-# Import PyInstaller utilities for collecting binaries
+# Import PyInstaller utilities for collecting binaries and data files
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs
+import os
 
 block_cipher = None
 
@@ -50,6 +51,65 @@ try:
 except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_dynamic_libs('tokenizers') failed: {e}")
 
+# Collect data files for py3langid (critical for LangSegment)
+# py3langid needs its data/model.plzma file
+_py3langid_data = []
+try:
+    _py3langid_data = collect_data_files('py3langid')
+    if _py3langid_data:
+        print(f"[CDMF.spec] Collected py3langid data files: {len(_py3langid_data)} files")
+        # Verify model.plzma is included
+        has_model = any('model.plzma' in str(path) for path, _ in _py3langid_data)
+        if not has_model:
+            print(f"[CDMF.spec] WARNING: model.plzma not found in collected py3langid data files")
+            # Try to find it manually
+            try:
+                import py3langid
+                from pathlib import Path
+                pkg_path = Path(py3langid.__file__).parent
+                model_file = pkg_path / 'data' / 'model.plzma'
+                if model_file.exists():
+                    _py3langid_data.append((str(model_file), 'py3langid/data'))
+                    print(f"[CDMF.spec] Manually added py3langid data/model.plzma")
+                else:
+                    print(f"[CDMF.spec] WARNING: model.plzma not found at {model_file}")
+            except Exception as e2:
+                print(f"[CDMF.spec] WARNING: Failed to manually locate py3langid data: {e2}")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('py3langid') failed: {e}")
+    # Try manual collection as fallback
+    try:
+        import py3langid
+        from pathlib import Path
+        pkg_path = Path(py3langid.__file__).parent
+        data_dir = pkg_path / 'data'
+        if data_dir.exists():
+            for data_file in data_dir.glob('*'):
+                if data_file.is_file():
+                    rel_path = data_file.relative_to(pkg_path)
+                    _py3langid_data.append((str(data_file), f'py3langid/{rel_path.parent}'))
+            print(f"[CDMF.spec] Manually collected {len(_py3langid_data)} py3langid data files")
+    except Exception as e2:
+        print(f"[CDMF.spec] WARNING: Manual py3langid data collection failed: {e2}")
+
+# Collect data files for acestep.models.lyrics_utils (VoiceBpeTokenizer may need vocab files)
+_acestep_lyrics_data = []
+try:
+    _acestep_lyrics_data = collect_data_files('acestep.models.lyrics_utils')
+    if _acestep_lyrics_data:
+        print(f"[CDMF.spec] Collected acestep.models.lyrics_utils data files: {len(_acestep_lyrics_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('acestep.models.lyrics_utils') failed: {e}")
+
+# Collect data files for tokenizers (may have vocab/model files)
+_tokenizers_data = []
+try:
+    _tokenizers_data = collect_data_files('tokenizers')
+    if _tokenizers_data:
+        print(f"[CDMF.spec] Collected tokenizers data files: {len(_tokenizers_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('tokenizers') failed: {e}")
+
 a = Analysis(
     ['music_forge_ui.py'],
     pathex=[],
@@ -68,7 +128,7 @@ a = Analysis(
         (str(ace_models_dir / 'ACE_STEP_CHANGES.txt'), 'ace_models'),
         # Include presets
         ('presets.json', '.'),
-    ],
+    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data,
     hiddenimports=[
         'diffusers',
         'diffusers.loaders',
