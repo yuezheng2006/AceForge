@@ -19,6 +19,210 @@
     return null;
   }
 
+  // ---------------------------------------------------------------------------
+  // fetch() shim for serverless mode
+  //
+  // The existing AceForge UI modules (static/scripts/cdmf_*.js) were originally
+  // written for a Flask server and use fetch('/some/endpoint').
+  //
+  // In serverless pywebview mode we map those fetch calls to window.pywebview.api
+  // methods so we can reuse the UI without a local HTTP server.
+  // ---------------------------------------------------------------------------
+
+  function makeJsonResponse(obj, status = 200) {
+    const body = JSON.stringify(obj ?? {});
+    return Promise.resolve(
+      new Response(body, {
+        status,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+  }
+
+  function parseUrl(input) {
+    try {
+      return new URL(input, window.location.href);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function readRequestBody(options) {
+    const body = options && options.body;
+    if (!body) return null;
+
+    // FormData -> object
+    if (typeof FormData !== 'undefined' && body instanceof FormData) {
+      const obj = {};
+      for (const [k, v] of body.entries()) obj[k] = v;
+      return obj;
+    }
+
+    // JSON string
+    if (typeof body === 'string') {
+      try { return JSON.parse(body); } catch (_) { return body; }
+    }
+
+    // If it's already an object, pass through
+    if (typeof body === 'object') return body;
+    return null;
+  }
+
+  if (isPywebview) {
+    const originalFetch = window.fetch ? window.fetch.bind(window) : null;
+    window.fetch = async function(input, options = {}) {
+      const api = getAPI();
+      const u = parseUrl(input);
+      const path = u ? u.pathname : (typeof input === 'string' ? input : '');
+      const method = (options.method || 'GET').toUpperCase();
+      const query = u ? u.searchParams : null;
+
+      // If API isn't ready yet, fall back.
+      if (!api) {
+        if (originalFetch) return originalFetch(input, options);
+        throw new Error('pywebview API not ready');
+      }
+
+      // Normalize cache-busters: /foo?_=
+      const cleanPath = path.split('?')[0];
+
+      try {
+        // Health
+        if (cleanPath === '/healthz') {
+          return makeJsonResponse({ ok: true });
+        }
+
+        // Progress
+        if (cleanPath === '/progress') {
+          const data = await api.getProgress();
+          return makeJsonResponse(data);
+        }
+
+        // Models
+        if (cleanPath === '/models/status') {
+          const data = await api.getModelStatus();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/models/ensure' && method === 'POST') {
+          const data = await api.downloadModels();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/models/folder') {
+          if (method === 'GET') {
+            const data = await api.getModelsFolder();
+            return makeJsonResponse(data);
+          }
+          if (method === 'POST') {
+            const bodyObj = await readRequestBody(options);
+            const folder = bodyObj && (bodyObj.folder || bodyObj.path || bodyObj.modelsFolder || bodyObj.value);
+            const data = await api.setModelsFolder(folder || '');
+            return makeJsonResponse(data);
+          }
+        }
+
+        // Tracks
+        if (cleanPath === '/tracks.json') {
+          const data = await api.getTracks();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/tracks/meta') {
+          if (method === 'GET') {
+            const name = query ? query.get('name') : null;
+            const data = await api.getTrackMeta(name || '');
+            return makeJsonResponse(data);
+          }
+          if (method === 'POST') {
+            const bodyObj = await readRequestBody(options);
+            const name = bodyObj && bodyObj.name;
+            const updates = Object.assign({}, bodyObj || {});
+            delete updates.name;
+            const data = await api.updateTrackMeta(name || '', updates);
+            return makeJsonResponse(data);
+          }
+        }
+        if (cleanPath === '/tracks/rename' && method === 'POST') {
+          const bodyObj = await readRequestBody(options);
+          const data = await api.renameTrack(bodyObj.old_name || bodyObj.oldName || '', bodyObj.new_name || bodyObj.newName || '');
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/tracks/delete' && method === 'POST') {
+          const bodyObj = await readRequestBody(options);
+          const data = await api.deleteTrack(bodyObj.name || '');
+          return makeJsonResponse(data);
+        }
+
+        // Presets
+        if (cleanPath === '/user_presets') {
+          if (method === 'GET') {
+            const data = await api.listPresets();
+            return makeJsonResponse(data);
+          }
+          if (method === 'POST') {
+            const bodyObj = await readRequestBody(options);
+            const data = await api.savePreset(bodyObj || {});
+            return makeJsonResponse(data);
+          }
+        }
+
+        // Lyrics / prompt helpers
+        if (cleanPath === '/lyrics/status') {
+          const data = await api.getLyricsModelStatus();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/lyrics/ensure' && method === 'POST') {
+          const data = await api.ensureLyricsModel();
+          return makeJsonResponse(data);
+        }
+        if ((cleanPath === '/lyrics/generate' || cleanPath === '/prompt_lyrics/generate') && method === 'POST') {
+          const bodyObj = await readRequestBody(options);
+          const data = await api.generatePromptLyrics(bodyObj || {});
+          return makeJsonResponse(data);
+        }
+
+        // MuFun
+        if (cleanPath === '/mufun/status') {
+          const data = await api.getMuFunStatus();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/mufun/ensure' && method === 'POST') {
+          const data = await api.ensureMuFun();
+          return makeJsonResponse(data);
+        }
+        if (cleanPath === '/mufun/analyze_dataset' && method === 'POST') {
+          const bodyObj = await readRequestBody(options);
+          const data = await api.analyzeDataset(bodyObj || {});
+          return makeJsonResponse(data);
+        }
+
+        // Training (best-effort compatibility; not all endpoints exist serverless yet)
+        if (cleanPath === '/train_lora/status') {
+          const data = await api.getLoraTrainingStatus();
+          return makeJsonResponse(data);
+        }
+
+        // Generation
+        if (cleanPath === '/generate' && method === 'POST') {
+          const bodyObj = await readRequestBody(options);
+          const data = await api.generate(bodyObj || {});
+          return makeJsonResponse(data);
+        }
+
+        // Shutdown
+        if (cleanPath === '/shutdown' && method === 'POST') {
+          await api.exitApp();
+          return makeJsonResponse({ ok: true });
+        }
+
+        // Fall back to real fetch (for file:// assets etc)
+        if (originalFetch) return originalFetch(input, options);
+        throw new Error('No fetch fallback available');
+      } catch (err) {
+        console.error('[PywebviewBridge] fetch shim error for', cleanPath, err);
+        return makeJsonResponse({ ok: false, error: String(err) }, 500);
+      }
+    };
+  }
+
   // Log message handler (called from Python)
   window.handleLogMessage = function(message) {
     const consoleOutput = document.getElementById('consoleOutput');

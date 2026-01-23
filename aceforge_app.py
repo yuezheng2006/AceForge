@@ -15,6 +15,7 @@ import time
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+import urllib.parse
 
 # Set environment variables early
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
@@ -791,16 +792,113 @@ def main():
         # In development, use project root
         base_path = Path(__file__).parent / 'static'
     
-    # Try to find the main HTML file
-    # First check for a standalone index.html, otherwise use loading.html
-    html_path = base_path / 'index.html'
-    if not html_path.exists():
-        html_path = base_path / 'loading.html'
-    
-    # If no HTML file exists, create a minimal one
-    if not html_path.exists():
-        html_path = base_path / 'aceforge_app.html'
-        _create_minimal_html(html_path)
+    # -----------------------------------------------------------------------
+    # UI entrypoint
+    #
+    # `static/loading.html` is a legacy splash that polls the old Flask server
+    # at http://127.0.0.1:5056/; in the new serverless pywebview app it will
+    # never transition into the real UI.
+    #
+    # Instead, render the full UI from `cdmf_template.py` at runtime and open
+    # it directly via file:// in pywebview.
+    # -----------------------------------------------------------------------
+
+    def _file_url(p: Path) -> str:
+        return "file://" + urllib.parse.quote(str(p))
+
+    def _render_ui_html(static_base: Path, api_obj: "AceForgeAPI") -> Path:
+        try:
+            from jinja2 import Template
+        except Exception as e:
+            raise RuntimeError("Jinja2 is required to render the UI template") from e
+
+        try:
+            import cdmf_template
+        except Exception as e:
+            raise RuntimeError("Failed to import cdmf_template for UI rendering") from e
+
+        # Initial UI state
+        try:
+            tracks_payload = api_obj.getTracks()
+            track_names = tracks_payload.get("tracks", []) if isinstance(tracks_payload, dict) else []
+        except Exception:
+            track_names = []
+
+        try:
+            presets_payload = api_obj.listPresets()
+            presets = presets_payload.get("presets", {"instrumental": [], "vocal": []}) if isinstance(presets_payload, dict) else {"instrumental": [], "vocal": []}
+        except Exception:
+            presets = {"instrumental": [], "vocal": []}
+
+        try:
+            model_payload = api_obj.getModelStatus()
+            model_state = model_payload.get("state", "unknown") if isinstance(model_payload, dict) else "unknown"
+            model_message = model_payload.get("message", "") if isinstance(model_payload, dict) else ""
+            models_ready = model_state == "ready"
+        except Exception:
+            model_state, model_message, models_ready = "unknown", "", False
+
+        # Output directory and track file URLs
+        try:
+            out_dir = Path(cdmf_paths.get_default_out_dir())
+        except Exception:
+            out_dir = Path.cwd() / "generated"
+
+        def url_for(endpoint: str, **kwargs) -> str:
+            # Static assets referenced by template
+            if endpoint == "static":
+                filename = kwargs.get("filename", "")
+                return filename
+
+            # Fake endpoints for legacy JS (we shim fetch() in pywebview_bridge.js)
+            if endpoint == "cdmf_generation.generate":
+                return "/generate"
+            if endpoint == "cdmf_tracks.serve_music":
+                name = kwargs.get("filename") or kwargs.get("name") or ""
+                return _file_url(out_dir / name)
+            if endpoint == "cdmf_training.train_lora_status":
+                return "/train_lora/status"
+            if endpoint == "cdmf_mufun.mufun_status":
+                return "/mufun/status"
+            if endpoint == "cdmf_mufun.mufun_ensure":
+                return "/mufun/ensure"
+            if endpoint == "cdmf_mufun.mufun_analyze_dataset":
+                return "/mufun/analyze_dataset"
+
+            return "/"
+
+        # Inject pywebview bridge before the main UI scripts
+        template_html = cdmf_template.HTML
+        injection = '\n  <script src="scripts/pywebview_bridge.js"></script>\n'
+        if "cdmf_presets_ui.js" in template_html and "pywebview_bridge.js" not in template_html:
+            template_html = template_html.replace(
+                '<script src="{{ url_for(\'static\', filename=\'scripts/cdmf_presets_ui.js\') }}"></script>',
+                injection + '  <script src="{{ url_for(\'static\', filename=\'scripts/cdmf_presets_ui.js\') }}"></script>',
+                1,
+            )
+
+        rendered = Template(template_html).render(
+            url_for=url_for,
+            presets=presets,
+            models_ready=models_ready,
+            model_state=model_state,
+            model_message=model_message,
+            autoplay_url="",
+            default_out_dir=str(out_dir),
+            tracks=track_names,
+            current_track=None,
+            basename=None,
+            error=None,
+            details=None,
+        )
+
+        ui_dir = Path.home() / "Library" / "Application Support" / "AceForge" / "ui"
+        ui_dir.mkdir(parents=True, exist_ok=True)
+        out_html = ui_dir / "index.html"
+        out_html.write_text(rendered, encoding="utf-8")
+        return out_html
+
+    html_path = _render_ui_html(base_path, api)
     
     print(f"[AceForge] Starting native window...", flush=True)
     print(f"[AceForge] HTML path: {html_path}", flush=True)
