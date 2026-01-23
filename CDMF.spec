@@ -221,7 +221,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Keep console for server logs
+    console=False,  # Hide console window for native app experience (pywebview handles UI)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -254,10 +254,14 @@ app = BUNDLE(
         'NSHighResolutionCapable': True,
         'LSMinimumSystemVersion': '12.0',
         'NSRequiresAquaSystemAppearance': False,
-        # Show in dock and run in foreground
+        # Show in dock and run in foreground (native app experience)
         'LSUIElement': False,
         'LSBackgroundOnly': False,
         'CFBundlePackageType': 'APPL',
+        # Native macOS app behavior
+        'NSAppTransportSecurity': {
+            'NSAllowsLocalNetworking': True,  # Allow localhost connections for Flask
+        },
         # The main executable will be the wrapper script added by build workflow
         'CFBundleExecutable': 'AceForge',
     },

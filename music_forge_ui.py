@@ -471,28 +471,83 @@ def main() -> None:
         # Use pywebview for native window experience
         try:
             import webview
+            import signal
+            
+            # Server control - use a shared event to coordinate shutdown
+            server_shutdown_event = threading.Event()
             
             # Start Flask server in a background thread
             def start_server():
                 """Start the Flask server in a background thread"""
                 try:
-                    # Start server (quiet mode reduces console output)
+                    # Use waitress serve (standard approach)
+                    # It will run until interrupted or the process exits
                     serve(app, host="127.0.0.1", port=5056)
                 except Exception as e:
-                    print(f"[AceForge] Server error: {e}", flush=True)
+                    if not server_shutdown_event.is_set():
+                        print(f"[AceForge] Server error: {e}", flush=True)
             
-            server_thread = threading.Thread(target=start_server, daemon=True)
+            def shutdown_server():
+                """Gracefully shutdown the Flask server"""
+                if server_shutdown_event.is_set():
+                    return  # Already shutting down
+                
+                print("[AceForge] Shutting down server...", flush=True)
+                server_shutdown_event.set()
+                
+                # Trigger shutdown via the /shutdown endpoint (if available)
+                # This uses urllib instead of requests to avoid extra dependency
+                try:
+                    from urllib.request import urlopen, Request
+                    from urllib.error import URLError
+                    req = Request("http://127.0.0.1:5056/shutdown", method="POST")
+                    urlopen(req, timeout=0.5)
+                except (URLError, Exception):
+                    # If endpoint doesn't work, send SIGTERM for graceful shutdown
+                    try:
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    except Exception:
+                        pass
+            
+            def on_closed():
+                """Callback when window is closed - shutdown everything"""
+                print("[AceForge] Window closed by user, shutting down...", flush=True)
+                shutdown_server()
+                # Exit after a brief moment for cleanup
+                import time
+                time.sleep(0.3)
+                sys.exit(0)
+            
+            # Start server thread (non-daemon so main process waits for it)
+            server_thread = threading.Thread(target=start_server, daemon=False, name="FlaskServer")
             server_thread.start()
             
-            # Wait a moment for server to start
-            import time
-            time.sleep(0.5)
+            # Wait for server to be ready (simple check with socket)
+            import socket
+            max_wait = 5
+            waited = 0
+            server_ready = False
+            while waited < max_wait and not server_ready:
+                try:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(0.5)
+                    result = sock.connect_ex(('127.0.0.1', 5056))
+                    sock.close()
+                    if result == 0:
+                        server_ready = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.2)
+                waited += 0.2
+            
+            if not server_ready:
+                print("[AceForge] WARNING: Server may not be ready", flush=True)
             
             # Create native window with pywebview
-            # Use the main UI URL (not loading page, as pywebview handles loading better)
             window_url = "http://127.0.0.1:5056/"
             
-            print("[AceForge] Opening native window with pywebview...", flush=True)
+            print("[AceForge] Opening native window...", flush=True)
             
             # Create window with native macOS styling
             window = webview.create_window(
@@ -503,16 +558,20 @@ def main() -> None:
                 min_size=(1000, 700),
                 resizable=True,
                 fullscreen=False,
-                # macOS-specific options
+                # macOS-specific options for native feel
                 on_top=False,
                 shadow=True,
+                # Window close callback - critical for proper shutdown
+                on_closed=on_closed,
             )
             
             # Start the GUI event loop (this blocks until window is closed)
+            # When window closes, on_closed() will be called automatically
             webview.start(debug=False)
             
-            # When window closes, the server thread will also stop (daemon thread)
-            print("[AceForge] Window closed, shutting down...", flush=True)
+            # This should not be reached (on_closed exits), but just in case
+            shutdown_server()
+            sys.exit(0)
             
         except ImportError:
             # Fallback to browser if pywebview is not available
