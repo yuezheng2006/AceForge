@@ -16,7 +16,10 @@ icon_path = spec_root / 'build' / 'macos' / 'AceForge.icns'
 a = Analysis(
     ['music_forge_ui.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+        # Include _lzma shared library if available (required for lzma module on some systems)
+        # PyInstaller will automatically find and include it if present
+    ],
     datas=[
         # Include static files (HTML, CSS, JS, images)
         (str(static_dir), 'static'),
@@ -75,6 +78,12 @@ a = Analysis(
         'soundfile',
         'einops',
         'rotary_embedding_torch',
+        # Language detection (used by ACE-Step LangSegment)
+        'py3langid',
+        'py3langid.langid',
+        # Standard library modules that PyInstaller sometimes misses
+        'lzma',  # Required by py3langid for loading pickled models
+        '_lzma',  # C extension for lzma (required on some systems)
     ],
     hookspath=[],
     hooksconfig={},
