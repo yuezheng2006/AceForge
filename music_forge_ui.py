@@ -534,8 +534,13 @@ def main() -> None:
     use_pywebview = is_frozen and not aceforge_app_loaded
     
     # ADDITIONAL SAFETY: Never use pywebview if aceforge_app is in sys.modules
+    # This check must happen BEFORE any webview import
     if aceforge_app_loaded:
+        print("[AceForge] CRITICAL: aceforge_app loaded - BLOCKING all webview usage in music_forge_ui", flush=True)
         use_pywebview = False
+        # Force Flask-only mode
+        serve(app, host="127.0.0.1", port=5056)
+        return
 
     # Configuration constants for pywebview mode (only used when running directly)
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
@@ -549,6 +554,15 @@ def main() -> None:
             # aceforge_app is loaded - this should never happen, but guard against it
             print("[AceForge] CRITICAL: aceforge_app loaded but use_pywebview is True - this is a bug!", flush=True)
             use_pywebview = False
+            serve(app, host="127.0.0.1", port=5056)
+            return
+        
+        # CRITICAL: Double-check aceforge_app is NOT loaded before importing webview
+        # If it is loaded, we should have already returned above, but check again as safety
+        if 'aceforge_app' in sys.modules:
+            print("[AceForge] CRITICAL: aceforge_app detected during webview import - BLOCKING", flush=True)
+            import traceback
+            print(f"[AceForge] Blocked webview import call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
             serve(app, host="127.0.0.1", port=5056)
             return
         
@@ -630,7 +644,18 @@ def main() -> None:
             
             print("[AceForge] Opening native window...", flush=True)
             
+            # CRITICAL: Final check before creating window - ensure aceforge_app is NOT loaded
+            if 'aceforge_app' in sys.modules:
+                print("[AceForge] CRITICAL: aceforge_app detected before window creation - BLOCKING", flush=True)
+                import traceback
+                print(f"[AceForge] Blocked window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+                serve(app, host="127.0.0.1", port=5056)
+                return
+            
             # Create window with native macOS styling
+            print("[AceForge] music_forge_ui.py creating window (should NOT happen if aceforge_app is loaded)", flush=True)
+            import traceback
+            print(f"[AceForge] music_forge_ui window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
             webview.create_window(
                 title="AceForge - AI Music Generation",
                 url=window_url,
