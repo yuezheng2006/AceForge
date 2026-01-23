@@ -98,7 +98,20 @@ if [ ! -f "$BUNDLED_BIN" ]; then
     exit 1
 fi
 
-# Code sign the app bundle (critical for macOS)
+# Add terminal launcher scripts (matching GitHub Actions workflow)
+echo ""
+echo "[Build] Adding launcher scripts to app bundle..."
+if [ -f "${APP_DIR}/launch_in_terminal.sh" ]; then
+    cp "${APP_DIR}/launch_in_terminal.sh" "${BUNDLED_APP}/Contents/MacOS/"
+    chmod +x "${BUNDLED_APP}/Contents/MacOS/launch_in_terminal.sh"
+fi
+
+if [ -f "${APP_DIR}/macos_terminal_launcher.sh" ]; then
+    cp "${APP_DIR}/macos_terminal_launcher.sh" "${BUNDLED_APP}/Contents/MacOS/AceForge"
+    chmod +x "${BUNDLED_APP}/Contents/MacOS/AceForge"
+fi
+
+# Code sign the app bundle (critical for macOS - must be LAST step)
 echo ""
 echo "[Build] Code signing app bundle..."
 if [ -f "${APP_DIR}/build/macos/codesign.sh" ]; then
@@ -106,6 +119,18 @@ if [ -f "${APP_DIR}/build/macos/codesign.sh" ]; then
     MACOS_SIGNING_IDENTITY="-" "${APP_DIR}/build/macos/codesign.sh" "$BUNDLED_APP"
     if [ $? -eq 0 ]; then
         echo "[Build] ✓ Code signing completed"
+        
+        # Remove quarantine attributes (allows app to run without Gatekeeper blocking)
+        echo "[Build] Removing quarantine attributes..."
+        xattr -cr "$BUNDLED_APP" 2>/dev/null || true
+        
+        # Verify the signature
+        echo "[Build] Verifying code signature..."
+        if codesign --verify --deep --strict --verbose=2 "$BUNDLED_APP" &> /dev/null; then
+            echo "[Build] ✓ Code signature verified"
+        else
+            echo "[Build] ⚠ Code signature verification had warnings"
+        fi
     else
         echo "[Build] ⚠ Code signing had warnings, but continuing..."
     fi
@@ -122,11 +147,16 @@ echo ""
 echo "App bundle: $BUNDLED_APP"
 echo "Binary: $BUNDLED_BIN"
 echo ""
+echo "⚠ IMPORTANT: macOS Gatekeeper may block adhoc-signed apps"
+echo "   If you see 'app is damaged' warning:"
+echo "   1. Right-click the app → Open (bypasses Gatekeeper)"
+echo "   2. Or run: xattr -cr \"$BUNDLED_APP\""
+echo ""
 echo "To test the app:"
 echo "  1. Check for ACE-Step models:"
 echo "     python ace_model_setup.py"
 echo ""
-echo "  2. Run the app:"
+echo "  2. Run the app (right-click → Open if blocked):"
 echo "     open \"$BUNDLED_APP\""
 echo ""
 echo "  3. Or run directly:"
