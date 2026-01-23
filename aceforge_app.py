@@ -36,6 +36,16 @@ from music_forge_ui import app
 # Import pywebview
 import webview
 
+# DEBUG: Install hooks to trace window creation (remove after finding bug)
+try:
+    import debug_window_creation
+    debug_window_creation.install_hooks()
+    print("[AceForge] DEBUG: Window creation hooks installed", flush=True)
+except ImportError:
+    pass  # Debug script not available
+except Exception as e:
+    print(f"[AceForge] DEBUG: Failed to install hooks: {e}", flush=True)
+
 # Server configuration
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5056
@@ -144,6 +154,9 @@ def main():
     # Create pywebview window pointing to Flask server
     # Only create if no windows exist and we haven't created one before
     if len(webview.windows) == 0 and not _window_created:
+        # DEBUG: Log window creation with full stack trace
+        import traceback
+        print(f"[AceForge] DEBUG: Creating window from:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         window = webview.create_window(
             title="AceForge - AI Music Generation",
             url=SERVER_URL,
@@ -157,10 +170,18 @@ def main():
             js_api=window_api,  # Expose window control API to JavaScript
         )
         _window_created = True
+        print(f"[AceForge] DEBUG: Window created, _window_created={_window_created}, webview.windows count={len(webview.windows)}", flush=True)
+    else:
+        print(f"[AceForge] DEBUG: Skipping window creation - windows={len(webview.windows)}, _window_created={_window_created}", flush=True)
     
     # CRITICAL: Mark that webview.start() is about to be called
     # This prevents any subsequent calls from creating duplicate windows
     _webview_started = True
+    
+    # DEBUG: Log webview.start() call
+    import traceback
+    print(f"[AceForge] DEBUG: Calling webview.start() from:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+    print(f"[AceForge] DEBUG: _webview_started={_webview_started}, _window_created={_window_created}, windows={len(webview.windows)}", flush=True)
     
     # Start the GUI event loop (only once - this is a blocking call)
     webview.start(debug=False)

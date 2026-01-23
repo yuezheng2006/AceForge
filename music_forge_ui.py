@@ -512,10 +512,19 @@ def main() -> None:
 
     is_frozen = getattr(sys, "frozen", False)
     # IMPORTANT: In frozen apps, aceforge_app.py handles pywebview
-    # Only use pywebview here if NOT imported by aceforge_app.py
-    # Double-check: if aceforge_app exists in modules, don't use pywebview
+    # CRITICAL FIX: NEVER use pywebview if aceforge_app is loaded (prevents duplicate windows)
     aceforge_app_loaded = 'aceforge_app' in sys.modules
-    use_pywebview = is_frozen and not aceforge_app_loaded
+    
+    # DEBUG: Log the decision to trace the bug
+    print(f"[AceForge] DEBUG music_forge_ui.main(): is_frozen={is_frozen}, aceforge_app_loaded={aceforge_app_loaded}, __name__={__name__}", flush=True)
+    if aceforge_app_loaded:
+        print(f"[AceForge] DEBUG: aceforge_app is loaded - DISABLING pywebview to prevent duplicate window", flush=True)
+        import traceback
+        print(f"[AceForge] DEBUG: Stack trace:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+    
+    # CRITICAL: If aceforge_app is loaded, NEVER use pywebview (it handles all windows)
+    # This prevents the duplicate window bug during model loading
+    use_pywebview = False if aceforge_app_loaded else (is_frozen and not aceforge_app_loaded)
 
     # Configuration constants for pywebview mode
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
