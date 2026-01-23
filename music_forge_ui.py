@@ -511,11 +511,12 @@ def main() -> None:
                 """Callback when window is closed - shutdown everything"""
                 print("[AceForge] Window closed by user, shutting down...", flush=True)
                 shutdown_server()
-                # Exit after a brief moment for cleanup
+                # Brief pause to allow server.close() to complete gracefully
                 time.sleep(0.3)
                 sys.exit(0)
             
-            # Start server thread (daemon so it doesn't block shutdown)
+            # Start server thread as daemon (will exit when main thread exits)
+            # The server is stopped programmatically via server.close() in on_closed()
             server_thread = threading.Thread(target=start_server, daemon=True, name="FlaskServer")
             server_thread.start()
             
@@ -588,6 +589,7 @@ def main() -> None:
             print("[AceForge] Falling back to browser...", flush=True)
             # Check if server is already running before starting a new one
             import socket
+            import webbrowser
             server_running = False
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -602,7 +604,6 @@ def main() -> None:
             if server_running:
                 # Server already running from failed pywebview attempt; just open browser
                 print("[AceForge] Server already running, opening browser...", flush=True)
-                import webbrowser
                 try:
                     webbrowser.open_new("http://127.0.0.1:5056/")
                 except Exception:
@@ -617,7 +618,6 @@ def main() -> None:
                     sys.exit(0)
             else:
                 # Start fresh server and browser
-                import webbrowser
                 try:
                     webbrowser.open_new("http://127.0.0.1:5056/")
                 except Exception:
