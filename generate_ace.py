@@ -11,6 +11,29 @@ from typing import Dict, Any, Optional, Callable, List
 # Make HF Hub use real files instead of symlinks (Windows privilege issue)
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
 
+# ---------------------------------------------------------------------------
+# Critical: Import lzma EARLY (before any ACE-Step imports)
+# This matches CI execution where lzma is available when py3langid needs it
+# ---------------------------------------------------------------------------
+try:
+    import lzma
+    import _lzma  # C extension - ensure it's loaded
+    # Test that lzma is functional (critical for py3langid in LangSegment)
+    _lzma_test_data = b"test_lzma_init"
+    _lzma_compressed = lzma.compress(_lzma_test_data)
+    _lzma_decompressed = lzma.decompress(_lzma_compressed)
+    if _lzma_decompressed == _lzma_test_data:
+        # Only print in frozen apps to avoid cluttering CI logs
+        if getattr(sys, 'frozen', False):
+            print("[generate_ace] lzma module initialized successfully (required for py3langid).", flush=True)
+    else:
+        print("[generate_ace] WARNING: lzma module test failed.", flush=True)
+except ImportError as e:
+    print(f"[generate_ace] WARNING: Failed to import lzma module: {e}", flush=True)
+    print("[generate_ace] Language detection (py3langid) may fail.", flush=True)
+except Exception as e:
+    print(f"[generate_ace] WARNING: lzma module initialization error: {e}", flush=True)
+
 from pydub import AudioSegment
 from ace_model_setup import ensure_ace_models
 

@@ -11,6 +11,14 @@ import logging
 import time
 from io import StringIO
 
+# ---------------------------------------------------------------------------
+# Environment setup to match CI execution (test-ace-generation.yml)
+# ---------------------------------------------------------------------------
+# Set PyTorch MPS memory management to match CI
+# CI sets: PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
+if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' not in os.environ:
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+
 from flask import Flask, Response, request
 
 # ---------------------------------------------------------------------------
