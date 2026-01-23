@@ -44,6 +44,7 @@ SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 # Global flag to ensure only one window is ever created
 _window_created = False
 _webview_started = False
+_window_instance = None
 
 def wait_for_server(max_wait=30):
     """Wait for Flask server to be ready"""
@@ -72,9 +73,68 @@ def start_flask_server():
         print(f"[AceForge] Flask server error: {e}", flush=True)
         raise
 
+# Event handlers for pywebview window
+def on_before_show(window):
+    """Called before window is shown"""
+    global _window_instance
+    _window_instance = window
+    print("[AceForge] Window about to be shown", flush=True)
+
+def on_closed():
+    """Called when window is closed"""
+    print("[AceForge] Window closed, exiting...", flush=True)
+    sys.exit(0)
+
+def on_closing():
+    """Called when window is closing"""
+    print("[AceForge] Window closing...", flush=True)
+
+def on_initialized(renderer):
+    """Called when GUI is initialized"""
+    global _webview_started
+    print(f"[AceForge] GUI initialized with renderer: {renderer}", flush=True)
+    
+    # CRITICAL: If webview is already started, prevent duplicate initialization
+    if _webview_started and len(webview.windows) > 1:
+        print("[AceForge] BLOCKED: Duplicate window initialization detected - canceling", flush=True)
+        return False  # Cancel initialization to prevent duplicate window
+    
+    # Return True to allow initialization
+    return True
+
+def on_shown():
+    """Called when window is shown"""
+    print("[AceForge] Window shown", flush=True)
+
+def on_minimized():
+    """Called when window is minimized"""
+    print("[AceForge] Window minimized", flush=True)
+
+def on_restored():
+    """Called when window is restored"""
+    print("[AceForge] Window restored", flush=True)
+
+def on_maximized():
+    """Called when window is maximized"""
+    print("[AceForge] Window maximized", flush=True)
+
+def on_resized(width, height):
+    """Called when window is resized"""
+    print(f"[AceForge] Window resized to {width} x {height}", flush=True)
+
+def on_loaded(window):
+    """Called when DOM is ready"""
+    global _window_instance
+    _window_instance = window
+    print("[AceForge] DOM loaded", flush=True)
+    
+    # The loading.html page will handle its own redirect via JavaScript
+    # when it detects the server is ready, so we don't need to do anything here
+    # Just log that the page loaded
+
 def main():
     """Main entry point: start Flask server and pywebview window"""
-    global _window_created, _webview_started
+    global _window_created, _webview_started, _window_instance
     
     # CRITICAL GUARD: Prevent multiple calls to main() or webview.start()
     if _webview_started:
@@ -89,37 +149,59 @@ def main():
     if len(webview.windows) > 0:
         print("[AceForge] BLOCKED: Window already exists, not creating another", flush=True)
         _window_created = True
-        # Don't call webview.start() here - it should already be running
-        # If we get here, something is wrong - just return
+        _webview_started = True
         return
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, daemon=True, name="FlaskServer")
     server_thread.start()
     
-    # Wait for server to be ready
-    print("[AceForge] Waiting for server to start...", flush=True)
-    if not wait_for_server():
-        print("[AceForge] ERROR: Server failed to start in time", flush=True)
-        sys.exit(1)
+    # Start with loading page - it will redirect to main UI once server is ready
+    loading_url = f"{SERVER_URL}loading"
     
-    print(f"[AceForge] Server ready at {SERVER_URL}", flush=True)
+    print(f"[AceForge] Creating window with loading page: {loading_url}", flush=True)
     
-    # Create pywebview window pointing to Flask server
-    # Only create if no windows exist and we haven't created one before
-    if len(webview.windows) == 0 and not _window_created:
-        window = webview.create_window(
-            title="AceForge - AI Music Generation",
-            url=SERVER_URL,
-            width=1400,
-            height=900,
-            min_size=(1000, 700),
-            resizable=True,
-            fullscreen=False,
-            on_top=False,
-            shadow=True,
-        )
-        _window_created = True
+    # Create pywebview window starting with loading page
+    window = webview.create_window(
+        title="AceForge - AI Music Generation",
+        url=loading_url,  # Start with loading page
+        width=1400,
+        height=900,
+        min_size=(1000, 700),
+        resizable=True,
+        fullscreen=False,
+        frameless=False,  # Show window controls (minimize/restore/close buttons)
+        on_top=False,
+        shadow=True,
+        text_select=True,  # Enable text selection
+        # Event handlers
+        on_before_show=on_before_show,
+        on_closed=on_closed,
+        on_closing=on_closing,
+        on_initialized=on_initialized,
+        on_shown=on_shown,
+        on_minimized=on_minimized,
+        on_restored=on_restored,
+        on_maximized=on_maximized,
+        on_resized=on_resized,
+        on_loaded=on_loaded,
+    )
+    
+    _window_instance = window
+    _window_created = True
+    
+    # Register event handlers on window object (alternative method)
+    try:
+        window.events.closed += on_closed
+        window.events.closing += on_closing
+        window.events.shown += on_shown
+        window.events.minimized += on_minimized
+        window.events.restored += on_restored
+        window.events.maximized += on_maximized
+        window.events.resized += on_resized
+        window.events.loaded += on_loaded
+    except Exception as e:
+        print(f"[AceForge] Warning: Could not register all event handlers: {e}", flush=True)
     
     # CRITICAL: Mark that webview.start() is about to be called
     # This prevents any subsequent calls from creating duplicate windows
