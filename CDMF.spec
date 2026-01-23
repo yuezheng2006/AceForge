@@ -40,11 +40,21 @@ except Exception as e:
         print(f"[CDMF.spec] WARNING: Manual _lzma binary search failed: {e2}")
         # PyInstaller should still find it automatically, but log the warning
 
+# Collect tokenizers binaries (Rust-based library with C extensions)
+# VoiceBpeTokenizer depends on tokenizers which has native extensions
+_tokenizers_binaries = []
+try:
+    _tokenizers_binaries = collect_dynamic_libs('tokenizers')
+    if _tokenizers_binaries:
+        print(f"[CDMF.spec] Collected tokenizers binaries via collect_dynamic_libs: {len(_tokenizers_binaries)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_dynamic_libs('tokenizers') failed: {e}")
+
 a = Analysis(
     ['music_forge_ui.py'],
     pathex=[],
-    binaries=_lzma_binaries + [
-        # _lzma binaries are collected above
+    binaries=_lzma_binaries + _tokenizers_binaries + [
+        # _lzma and tokenizers binaries are collected above
         # Additional binaries can be added here if needed
     ],
     datas=[
@@ -105,6 +115,13 @@ a = Analysis(
         'soundfile',
         'einops',
         'rotary_embedding_torch',
+        # Tokenizers library (required by VoiceBpeTokenizer)
+        'tokenizers',
+        'tokenizers.implementations',
+        'tokenizers.models',
+        'tokenizers.pre_tokenizers',
+        'tokenizers.processors',
+        'tokenizers.trainers',
         # Language detection (used by ACE-Step LangSegment)
         'py3langid',
         'py3langid.langid',

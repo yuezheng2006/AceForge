@@ -481,7 +481,26 @@ class ACEStepPipeline:
                 def getCounts(self):
                     return [('en', 1)]
             self.lang_segment = DummyLangSegment()
-        self.lyric_tokenizer = VoiceBpeTokenizer()
+        
+        # Initialize VoiceBpeTokenizer with error handling for frozen app compatibility
+        try:
+            if VoiceBpeTokenizer is None:
+                raise RuntimeError("VoiceBpeTokenizer could not be imported")
+            self.lyric_tokenizer = VoiceBpeTokenizer()
+        except Exception as tokenizer_err:
+            error_msg = str(tokenizer_err)
+            logger.error(
+                f"Failed to initialize VoiceBpeTokenizer: {error_msg}\n"
+                "This is likely a PyInstaller bundling issue. The tokenizers library "
+                "or its dependencies may not be properly included in the frozen app bundle.\n"
+                "Generation will fail without the lyric tokenizer."
+            )
+            # Re-raise the error since we can't proceed without the tokenizer
+            raise RuntimeError(
+                f"VoiceBpeTokenizer initialization failed: {error_msg}\n"
+                "This is a critical component required for generation. "
+                "Please check the build logs and ensure all dependencies are bundled."
+            ) from tokenizer_err
 
         text_encoder_model = UMT5EncoderModel.from_pretrained(
             text_encoder_checkpoint_path, torch_dtype=self.dtype
@@ -624,7 +643,25 @@ class ACEStepPipeline:
                     return [('en', 1)]
             self.lang_segment = DummyLangSegment()
         
-        self.lyric_tokenizer = VoiceBpeTokenizer()
+        # Initialize VoiceBpeTokenizer with error handling (same as in load_checkpoint)
+        try:
+            if VoiceBpeTokenizer is None:
+                raise RuntimeError("VoiceBpeTokenizer could not be imported")
+            self.lyric_tokenizer = VoiceBpeTokenizer()
+        except Exception as tokenizer_err:
+            error_msg = str(tokenizer_err)
+            logger.error(
+                f"Failed to initialize VoiceBpeTokenizer: {error_msg}\n"
+                "This is likely a PyInstaller bundling issue. The tokenizers library "
+                "or its dependencies may not be properly included in the frozen app bundle.\n"
+                "Generation will fail without the lyric tokenizer."
+            )
+            # Re-raise the error since we can't proceed without the tokenizer
+            raise RuntimeError(
+                f"VoiceBpeTokenizer initialization failed: {error_msg}\n"
+                "This is a critical component required for generation. "
+                "Please check the build logs and ensure all dependencies are bundled."
+            ) from tokenizer_err
 
         self.loaded = True
 
