@@ -472,13 +472,11 @@ def main() -> None:
         # This is a weird case - module was imported but then run directly
         # Still check if aceforge_app is loaded
         if 'aceforge_app' in sys.modules:
-            print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
             return
     
     # Additional safety check: If aceforge_app is in sys.modules, we're being imported
     # by aceforge_app.py and should NOT create windows
     if 'aceforge_app' in sys.modules:
-        print("[AceForge] BLOCKED: music_forge_ui.main() called but aceforge_app is loaded - skipping to prevent duplicate windows", flush=True)
         return
     
     from waitress import serve
@@ -550,7 +548,6 @@ def main() -> None:
         # CRITICAL: Double-check that aceforge_app is NOT loaded before importing webview
         if 'aceforge_app' in sys.modules:
             # aceforge_app is loaded - this should never happen, but guard against it
-            print("[AceForge] CRITICAL: aceforge_app loaded but use_pywebview is True - this is a bug!", flush=True)
             use_pywebview = False
             serve(app, host="127.0.0.1", port=5056)
             return
