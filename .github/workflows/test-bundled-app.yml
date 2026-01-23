@@ -212,96 +212,94 @@ jobs:
         echo "This will catch runtime bundling issues (missing binaries, data files, etc.)"
         
         # Create a test script that imports and uses generate_ace
-        cat > test_bundled_generation.py << 'TESTSCRIPT'
-import sys
-import os
-from pathlib import Path
-
-# Set environment to match CI
-os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
-
-print("=" * 60)
-print("Bundled App Generation Test")
-print("=" * 60)
-print(f"Python executable: {sys.executable}")
-print(f"Frozen: {getattr(sys, 'frozen', False)}")
-print(f"Python version: {sys.version}")
-print("=" * 60)
-
-# Import from the bundled app's modules
-try:
-    from generate_ace import generate_track_ace
-    print("✓ generate_track_ace imported successfully")
-except Exception as e:
-    print(f"✗ Failed to import generate_track_ace: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-
-# Run a minimal generation test
-print("")
-print("Starting generation test (10 seconds, 5 steps)...")
-try:
-    result = generate_track_ace(
-        genre_prompt="upbeat electronic music, synthwave",
-        instrumental=True,
-        target_seconds=10,
-        steps=5,
-        guidance_scale=4.0,
-        seed=42,
-        out_dir=Path("test_output_bundled"),
-        basename="ci_test_bundled_track"
-    )
-    
-    print("")
-    print("✓ Generation completed successfully")
-    print(f"Result keys: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
-    
-    # Check if output file was created
-    output_dir = Path("test_output_bundled")
-    if not output_dir.exists():
-        print(f"✗ Output directory does not exist: {output_dir}")
-        sys.exit(1)
-    
-    wav_files = list(output_dir.glob("*.wav"))
-    if not wav_files:
-        print(f"✗ No WAV files found in {output_dir}")
-        sys.exit(1)
-    
-    MIN_SIZE = 100_000  # Minimum expected size for 10-second audio
-    for wav_file in wav_files:
-        size = wav_file.stat().st_size
-        print(f"✓ Generated file: {wav_file.name} ({size:,} bytes)")
-        if size == 0:
-            print(f"✗ File is empty: {wav_file.name}")
-            sys.exit(1)
-        if size < MIN_SIZE:
-            print(f"⚠ File seems small for 10 seconds: {wav_file.name} ({size:,} bytes)")
-    
-    print("")
-    print("=" * 60)
-    print("✓ Bundled app generation test PASSED")
-    print("=" * 60)
+        # Use Python -c with a here-string to avoid YAML parsing issues
+        "$BUNDLED_BIN" -c "
+        import sys
+        import os
+        from pathlib import Path
         
-except Exception as e:
-    print("")
-    print("=" * 60)
-    print("✗ Generation failed")
-    print("=" * 60)
-    print(f"Error: {e}")
-    print("")
-    print("Full traceback:")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
-TESTSCRIPT
-
-        # Run the test using the bundled binary
-        "$BUNDLED_BIN" test_bundled_generation.py || {
+        # Set environment to match CI
+        os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+        
+        print('=' * 60)
+        print('Bundled App Generation Test')
+        print('=' * 60)
+        print(f'Python executable: {sys.executable}')
+        print(f'Frozen: {getattr(sys, \"frozen\", False)}')
+        print(f'Python version: {sys.version}')
+        print('=' * 60)
+        
+        # Import from the bundled app's modules
+        try:
+            from generate_ace import generate_track_ace
+            print('✓ generate_track_ace imported successfully')
+        except Exception as e:
+            print(f'✗ Failed to import generate_track_ace: {e}')
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+        
+        # Run a minimal generation test
+        print('')
+        print('Starting generation test (10 seconds, 5 steps)...')
+        try:
+            result = generate_track_ace(
+                genre_prompt='upbeat electronic music, synthwave',
+                instrumental=True,
+                target_seconds=10,
+                steps=5,
+                guidance_scale=4.0,
+                seed=42,
+                out_dir=Path('test_output_bundled'),
+                basename='ci_test_bundled_track'
+            )
+            
+            print('')
+            print('✓ Generation completed successfully')
+            print(f'Result keys: {list(result.keys()) if isinstance(result, dict) else \"N/A\"}')
+            
+            # Check if output file was created
+            output_dir = Path('test_output_bundled')
+            if not output_dir.exists():
+                print(f'✗ Output directory does not exist: {output_dir}')
+                sys.exit(1)
+            
+            wav_files = list(output_dir.glob('*.wav'))
+            if not wav_files:
+                print(f'✗ No WAV files found in {output_dir}')
+                sys.exit(1)
+            
+            MIN_SIZE = 100_000  # Minimum expected size for 10-second audio
+            for wav_file in wav_files:
+                size = wav_file.stat().st_size
+                print(f'✓ Generated file: {wav_file.name} ({size:,} bytes)')
+                if size == 0:
+                    print(f'✗ File is empty: {wav_file.name}')
+                    sys.exit(1)
+                if size < MIN_SIZE:
+                    print(f'⚠ File seems small for 10 seconds: {wav_file.name} ({size:,} bytes)')
+            
+            print('')
+            print('=' * 60)
+            print('✓ Bundled app generation test PASSED')
+            print('=' * 60)
+                
+        except Exception as e:
+            print('')
+            print('=' * 60)
+            print('✗ Generation failed')
+            print('=' * 60)
+            print(f'Error: {e}')
+            print('')
+            print('Full traceback:')
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+        " || {
           echo ""
-          echo "=" 
+          echo "=================================================="
           echo "✗ Bundled app generation test FAILED"
-          echo "=" 
+          echo "=================================================="
           echo "This indicates a PyInstaller bundling issue that needs to be fixed."
           echo "Check the error messages above to identify missing dependencies."
           exit 1
