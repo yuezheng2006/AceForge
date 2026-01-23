@@ -111,7 +111,7 @@ except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_data_files('tokenizers') failed: {e}")
 
 a = Analysis(
-    ['music_forge_ui.py'],
+    ['aceforge_app.py'],
     pathex=[],
     binaries=_lzma_binaries + _tokenizers_binaries + [
         # _lzma and tokenizers binaries are collected above
