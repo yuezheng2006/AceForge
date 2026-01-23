@@ -30,66 +30,107 @@ try:
 except Exception as e:
     print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
 
-# Import pywebview FIRST and patch it BEFORE importing music_forge_ui
-# This ensures that even if music_forge_ui tries to use webview, it will be protected
-import webview
-
-# CRITICAL: Singleton guards for webview operations
-# These ensure webview.create_window() and webview.start() can ONLY be called once
-# This must happen BEFORE importing music_forge_ui to protect against any webview usage there
-_original_webview_start = webview.start
-_original_webview_create_window = webview.create_window
+# CRITICAL: Global state for singleton enforcement (persists across re-imports)
 _webview_start_called = False
 _webview_window_created = False
 _webview_lock = threading.Lock()
+_webview_patched = False  # Track if we've patched webview
 
-def _singleton_webview_start(*args, **kwargs):
-    """Singleton wrapper for webview.start() - prevents duplicate event loops"""
-    global _webview_start_called
+def _patch_webview_module():
+    """Patch webview module to enforce singleton behavior - call this whenever webview might be re-imported"""
+    global _webview_patched, _original_webview_start, _original_webview_create_window
     
-    with _webview_lock:
-        if _webview_start_called:
-            # webview.start() already called - BLOCK and log the attempt
-            import traceback
-            print("[AceForge] BLOCKED: webview.start() called but already running", flush=True)
-            print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+    # Import webview (may be re-imported, that's OK)
+    import webview
+    
+    # Only patch if not already patched, or if the patch was lost (re-import)
+    if not _webview_patched or not hasattr(webview, '_aceforge_patched'):
+        _original_webview_start = webview.start
+        _original_webview_create_window = webview.create_window
+        
+        def _singleton_webview_start(*args, **kwargs):
+            """Singleton wrapper for webview.start() - prevents duplicate event loops"""
+            global _webview_start_called
+            
+            with _webview_lock:
+                if _webview_start_called:
+                    # webview.start() already called - BLOCK and log the attempt
+                    import traceback
+                    print("[AceForge] BLOCKED: webview.start() called but already running", flush=True)
+                    print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+                    return None
+                
+                _webview_start_called = True
+                print("[AceForge] webview.start() called (first time) - starting GUI event loop", flush=True)
+                import traceback
+                print(f"[AceForge] webview.start() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+                return _original_webview_start(*args, **kwargs)
+
+        def _singleton_webview_create_window(*args, **kwargs):
+            """Singleton wrapper for webview.create_window() - prevents duplicate windows"""
+            global _webview_window_created
+            
+            with _webview_lock:
+                if _webview_window_created:
+                    # Window already created - BLOCK and log the attempt
+                    import traceback
+                    print("[AceForge] BLOCKED: webview.create_window() called but window already exists", flush=True)
+                    print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+                    # Return existing window if available, otherwise None
+                    if webview.windows:
+                        return webview.windows[0]
+                    return None
+                
+                _webview_window_created = True
+                print("[AceForge] webview.create_window() called (first time) - creating window", flush=True)
+                import traceback
+                print(f"[AceForge] Window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
+                return _original_webview_create_window(*args, **kwargs)
+        
+        # Replace webview functions with singleton wrappers
+        webview.start = _singleton_webview_start
+        webview.create_window = _singleton_webview_create_window
+        webview._aceforge_patched = True  # Mark as patched
+        _webview_patched = True
+        print("[AceForge] webview module patched for singleton enforcement", flush=True)
+
+# Patch webview IMMEDIATELY and set up import hook to re-patch if re-imported
+_patch_webview_module()
+
+# Set up import hook using sys.meta_path (safer than patching __builtins__.__import__)
+if getattr(sys, 'frozen', False):
+    import importlib.util
+    
+    class WebviewImportHook:
+        """Import hook to re-patch webview whenever it's imported"""
+        def find_spec(self, name, path, target=None):
+            if name == 'webview':
+                # webview is being imported - we'll patch it after import
+                return None  # Let normal import proceed
             return None
         
-        _webview_start_called = True
-        print("[AceForge] webview.start() called (first time) - starting GUI event loop", flush=True)
-        import traceback
-        print(f"[AceForge] webview.start() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
-        return _original_webview_start(*args, **kwargs)
-
-def _singleton_webview_create_window(*args, **kwargs):
-    """Singleton wrapper for webview.create_window() - prevents duplicate windows"""
-    global _webview_window_created
-    
-    with _webview_lock:
-        if _webview_window_created:
-            # Window already created - BLOCK and log the attempt
-            import traceback
-            print("[AceForge] BLOCKED: webview.create_window() called but window already exists", flush=True)
-            print(f"[AceForge] Blocked call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
-            # Return existing window if available, otherwise None
-            if webview.windows:
-                return webview.windows[0]
+        def find_module(self, name, path=None):
+            # Python 3.3+ uses find_spec, but keep this for compatibility
             return None
-        
-        _webview_window_created = True
-        print("[AceForge] webview.create_window() called (first time) - creating window", flush=True)
-        import traceback
-        print(f"[AceForge] Window creation call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
-        return _original_webview_create_window(*args, **kwargs)
-
-# Replace webview functions with singleton wrappers IMMEDIATELY
-# This protects against any code that imports webview after this point
-webview.start = _singleton_webview_start
-webview.create_window = _singleton_webview_create_window
+    
+    # Install the import hook
+    if WebviewImportHook not in sys.meta_path:
+        sys.meta_path.insert(0, WebviewImportHook())
+    
+    # Also patch after any import by hooking into importlib
+    _original_import_module = importlib.import_module
+    def _patched_import_module(name, *args, **kwargs):
+        module = _original_import_module(name, *args, **kwargs)
+        if name == 'webview' or (hasattr(module, '__name__') and module.__name__ == 'webview'):
+            _patch_webview_module()
+        return module
+    importlib.import_module = _patched_import_module
 
 # NOW import Flask app from music_forge_ui
 # If music_forge_ui tries to use webview, it will get the patched (protected) version
+# Re-patch webview after import in case music_forge_ui imported it
 from music_forge_ui import app
+_patch_webview_module()  # Re-patch in case music_forge_ui imported webview
 
 # Server configuration
 SERVER_HOST = "127.0.0.1"
@@ -270,6 +311,12 @@ def main():
         # Use os._exit to bypass any cleanup handlers that might trigger re-init
         os._exit(0)
     
+    # Re-patch webview before creating window (in case it was re-imported)
+    _patch_webview_module()
+    
+    # Import webview to ensure we have the patched version
+    import webview
+    
     # Create pywebview window pointing to Flask server
     # The singleton wrapper ensures this can only be called once
     window = webview.create_window(
@@ -313,8 +360,45 @@ def main():
 
 
 if __name__ == '__main__':
+    # CRITICAL: In PyInstaller frozen apps, modules can be re-executed
+    # Use a simple file-based lock to prevent multiple main() executions
+    import tempfile
+    _lock_file = Path(tempfile.gettempdir()) / 'aceforge_app.lock'
+    
+    # Check if lock file exists
+    if _lock_file.exists():
+        try:
+            # Try to read PID from lock file
+            with open(_lock_file, 'r') as f:
+                pid = int(f.read().strip())
+            # Check if process is still alive (simple check)
+            try:
+                os.kill(pid, 0)  # Signal 0 just checks if process exists
+                # Process exists - another instance is running
+                print(f"[AceForge] Another instance is already running (PID {pid}) - exiting", flush=True)
+                sys.exit(1)
+            except ProcessLookupError:
+                # Process is dead - remove stale lock file
+                _lock_file.unlink(missing_ok=True)
+            except PermissionError:
+                # Can't check, but assume it's running
+                print(f"[AceForge] Lock file exists (PID {pid}) - assuming another instance is running", flush=True)
+                sys.exit(1)
+        except (ValueError, FileNotFoundError):
+            # Lock file is invalid or missing - remove it
+            _lock_file.unlink(missing_ok=True)
+    
+    # Create lock file
+    try:
+        _lock_file.write_text(str(os.getpid()))
+    except Exception:
+        pass
+    
     try:
         main()
+    finally:
+        # Remove lock file on exit
+        _lock_file.unlink(missing_ok=True)
     except Exception as e:
         import traceback
         error_msg = (

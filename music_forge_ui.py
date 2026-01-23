@@ -327,7 +327,8 @@ class StreamToLogger:
 # Redirect stdout and stderr to logging (for frozen app)
 if getattr(sys, 'frozen', False):
     sys.stdout = StreamToLogger(logging.getLogger('STDOUT'), logging.INFO)
-    sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.ERROR)
+    # Use WARNING level for stderr to avoid logging FutureWarning as ERROR
+    sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.WARNING)
 
 # Wire ACE-Step's progress callback into our shared state
 register_progress_callback(cdmf_state.ace_progress_callback)
