@@ -41,6 +41,9 @@ SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 5056
 SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 
+# Global flag to ensure only one window is ever created
+_window_created = False
+
 def wait_for_server(max_wait=30):
     """Wait for Flask server to be ready"""
     waited = 0
@@ -70,6 +73,19 @@ def start_flask_server():
 
 def main():
     """Main entry point: start Flask server and pywebview window"""
+    global _window_created
+    
+    # Guard: Ensure only one window is ever created
+    if _window_created:
+        print("[AceForge] WARNING: Window already created, not creating another", flush=True)
+        return
+    
+    if len(webview.windows) > 0:
+        print("[AceForge] WARNING: Window already exists, not creating another", flush=True)
+        _window_created = True
+        # If window exists, just start the event loop
+        webview.start(debug=False)
+        return
     
     # Start Flask server in background thread
     server_thread = threading.Thread(target=start_flask_server, daemon=True, name="FlaskServer")
@@ -84,19 +100,22 @@ def main():
     print(f"[AceForge] Server ready at {SERVER_URL}", flush=True)
     
     # Create pywebview window pointing to Flask server
-    window = webview.create_window(
-        title="AceForge - AI Music Generation",
-        url=SERVER_URL,
-        width=1400,
-        height=900,
-        min_size=(1000, 700),
-        resizable=True,
-        fullscreen=False,
-        on_top=False,
-        shadow=True,
-    )
+    # Only create if no windows exist and we haven't created one before
+    if len(webview.windows) == 0 and not _window_created:
+        window = webview.create_window(
+            title="AceForge - AI Music Generation",
+            url=SERVER_URL,
+            width=1400,
+            height=900,
+            min_size=(1000, 700),
+            resizable=True,
+            fullscreen=False,
+            on_top=False,
+            shadow=True,
+        )
+        _window_created = True
     
-    # Start the GUI event loop
+    # Start the GUI event loop (only once)
     webview.start(debug=False)
     
     # Cleanup after window closes

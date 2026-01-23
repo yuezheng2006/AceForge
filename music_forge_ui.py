@@ -450,6 +450,15 @@ def shutdown_server():
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    """
+    Legacy main function - only used when music_forge_ui.py is run directly.
+    When imported by aceforge_app.py, this function should NOT be called.
+    """
+    # Guard: If we're being imported (not run directly), don't execute
+    # This prevents aceforge_app.py from accidentally triggering this code
+    if not (__name__ == "__main__" or getattr(sys, '_called_from_test', False)):
+        return
+    
     from waitress import serve
 
     # Do not download the ACE-Step model here. Instead, let the UI trigger
@@ -480,7 +489,9 @@ def main() -> None:
     )
 
     is_frozen = getattr(sys, "frozen", False)
-    use_pywebview = is_frozen  # Use pywebview for frozen apps (native experience)
+    # IMPORTANT: In frozen apps, aceforge_app.py handles pywebview
+    # Only use pywebview here if NOT imported by aceforge_app.py
+    use_pywebview = is_frozen and not hasattr(sys.modules.get('aceforge_app', None), '__file__')
 
     # Configuration constants for pywebview mode
     SERVER_SHUTDOWN_DELAY = 0.3  # Seconds to wait for graceful shutdown
