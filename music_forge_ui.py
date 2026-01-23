@@ -512,7 +512,6 @@ def main() -> None:
                 print("[AceForge] Window closed by user, shutting down...", flush=True)
                 shutdown_server()
                 # Exit after a brief moment for cleanup
-                import time
                 time.sleep(0.3)
                 sys.exit(0)
             
@@ -522,7 +521,6 @@ def main() -> None:
             
             # Wait for server to be ready (simple check with socket)
             import socket
-            import time
             max_wait = 5
             waited = 0
             server_ready = False
@@ -589,7 +587,6 @@ def main() -> None:
             print(f"[AceForge] Error with pywebview: {e}", flush=True)
             print("[AceForge] Falling back to browser...", flush=True)
             # Check if server is already running before starting a new one
-            import socket
             server_running = False
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -612,7 +609,6 @@ def main() -> None:
                     pass
                 # Keep main thread alive (server is in background thread)
                 try:
-                    import time
                     while True:
                         time.sleep(1)
                 except KeyboardInterrupt:
