@@ -125,7 +125,6 @@ p {
 .cd-alpha {
   font-size: 12px;
   color: var(--cd-text-dim);
-  border: 1px solid var(--cd-border);
   padding: 2px 8px;
   border-radius: 999px;
   margin-left: auto;
@@ -139,8 +138,8 @@ p {
 
 .cd-logo img,
 .cd-logo svg {
-  width: 26px;
-  height: 26px;
+  width: 50px;
+  height: 50px;
   display: block;
 }
 
