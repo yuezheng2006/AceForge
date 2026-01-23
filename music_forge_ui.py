@@ -471,42 +471,40 @@ def main() -> None:
         # Use pywebview for native window experience
         try:
             import webview
-            import signal
+            from waitress import create_server
             
-            # Server control - use a shared event to coordinate shutdown
+            # Server control - use a shared reference to the server instance
+            server_instance = None
             server_shutdown_event = threading.Event()
             
-            # Start Flask server in a background thread
+            # Start Flask server in a background thread using programmatic approach
             def start_server():
                 """Start the Flask server in a background thread"""
+                nonlocal server_instance
                 try:
-                    # Use waitress serve (standard approach)
-                    # It will run until interrupted or the process exits
-                    serve(app, host="127.0.0.1", port=5056)
+                    # Create server instance for programmatic control
+                    server_instance = create_server(app, host="127.0.0.1", port=5056)
+                    print("[AceForge] Server starting on http://127.0.0.1:5056", flush=True)
+                    server_instance.run()
                 except Exception as e:
                     if not server_shutdown_event.is_set():
                         print(f"[AceForge] Server error: {e}", flush=True)
             
             def shutdown_server():
                 """Gracefully shutdown the Flask server"""
+                nonlocal server_instance
                 if server_shutdown_event.is_set():
                     return  # Already shutting down
                 
                 print("[AceForge] Shutting down server...", flush=True)
                 server_shutdown_event.set()
                 
-                # Trigger shutdown via the /shutdown endpoint (if available)
-                # This uses urllib instead of requests to avoid extra dependency
-                try:
-                    from urllib.request import urlopen, Request
-                    from urllib.error import URLError
-                    req = Request("http://127.0.0.1:5056/shutdown", method="POST")
-                    urlopen(req, timeout=0.5)
-                except (URLError, Exception):
-                    # If endpoint doesn't work, send SIGTERM for graceful shutdown
+                # Use programmatic shutdown instead of signals
+                if server_instance is not None:
                     try:
-                        os.kill(os.getpid(), signal.SIGTERM)
+                        server_instance.close()
                     except Exception:
+                        # Best-effort shutdown; ignore failures during cleanup
                         pass
             
             def on_closed():
@@ -518,12 +516,13 @@ def main() -> None:
                 time.sleep(0.3)
                 sys.exit(0)
             
-            # Start server thread (non-daemon so main process waits for it)
-            server_thread = threading.Thread(target=start_server, daemon=False, name="FlaskServer")
+            # Start server thread (daemon so it doesn't block shutdown)
+            server_thread = threading.Thread(target=start_server, daemon=True, name="FlaskServer")
             server_thread.start()
             
             # Wait for server to be ready (simple check with socket)
             import socket
+            import time
             max_wait = 5
             waited = 0
             server_ready = False
@@ -537,6 +536,7 @@ def main() -> None:
                         server_ready = True
                         break
                 except Exception:
+                    # Socket check failed; continue waiting
                     pass
                 time.sleep(0.2)
                 waited += 0.2
@@ -550,7 +550,7 @@ def main() -> None:
             print("[AceForge] Opening native window...", flush=True)
             
             # Create window with native macOS styling
-            window = webview.create_window(
+            webview.create_window(
                 title="AceForge - AI Music Generation",
                 url=window_url,
                 width=1400,
@@ -580,25 +580,61 @@ def main() -> None:
             try:
                 webbrowser.open_new("http://127.0.0.1:5056/")
             except Exception:
+                # Browser launch failed; user can manually navigate to URL
                 pass
             # Start Flask (blocking)
             serve(app, host="127.0.0.1", port=5056)
         except Exception as e:
+            # pywebview initialization failed; fall back to browser
             print(f"[AceForge] Error with pywebview: {e}", flush=True)
             print("[AceForge] Falling back to browser...", flush=True)
-            import webbrowser
+            # Check if server is already running before starting a new one
+            import socket
+            server_running = False
             try:
-                webbrowser.open_new("http://127.0.0.1:5056/")
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.5)
+                result = sock.connect_ex(('127.0.0.1', 5056))
+                sock.close()
+                server_running = (result == 0)
             except Exception:
+                # Socket check failed; assume server not running
                 pass
-            # Start Flask (blocking)
-            serve(app, host="127.0.0.1", port=5056)
+            
+            if server_running:
+                # Server already running from failed pywebview attempt; just open browser
+                print("[AceForge] Server already running, opening browser...", flush=True)
+                import webbrowser
+                try:
+                    webbrowser.open_new("http://127.0.0.1:5056/")
+                except Exception:
+                    # Browser launch failed; user can manually navigate to URL
+                    pass
+                # Keep main thread alive (server is in background thread)
+                try:
+                    import time
+                    while True:
+                        time.sleep(1)
+                except KeyboardInterrupt:
+                    print("[AceForge] Interrupted by user", flush=True)
+                    sys.exit(0)
+            else:
+                # Start fresh server and browser
+                import webbrowser
+                try:
+                    webbrowser.open_new("http://127.0.0.1:5056/")
+                except Exception:
+                    # Browser launch failed; user can manually navigate to URL
+                    pass
+                # Start Flask (blocking)
+                serve(app, host="127.0.0.1", port=5056)
     else:
         # Development mode: use browser
         import webbrowser
         try:
             webbrowser.open_new("http://127.0.0.1:5056/")
         except Exception:
+            # Browser launch failed; user can manually navigate to URL
             pass
         # Start Flask (blocking)
         serve(app, host="127.0.0.1", port=5056)
