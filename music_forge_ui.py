@@ -436,7 +436,6 @@ def shutdown_server():
 
 def main() -> None:
     from waitress import serve
-    import webbrowser
 
     # Do not download the ACE-Step model here. Instead, let the UI trigger
     # a background download so the server can start quickly.
@@ -466,37 +465,84 @@ def main() -> None:
     )
 
     is_frozen = getattr(sys, "frozen", False)
+    use_pywebview = is_frozen  # Use pywebview for frozen apps (native experience)
 
-    # macOS-focused: Use webbrowser to open loading page or main URL
-    # Use a module-level flag to ensure browser only opens once
-    if is_frozen and not hasattr(main, '_browser_opened'):
+    if use_pywebview:
+        # Use pywebview for native window experience
         try:
-            # Set flag immediately to prevent multiple opens
-            main._browser_opened = True
+            import webview
             
-            static_root = Path(app.static_folder or (cdmf_paths.APP_DIR / "static"))
-            loader_path = static_root / "loading.html"
-
-            # Use webbrowser.open_new() to ensure a new window, not a tab
-            if loader_path.exists():
+            # Start Flask server in a background thread
+            def start_server():
+                """Start the Flask server in a background thread"""
                 try:
-                    webbrowser.open_new(loader_path.as_uri())
-                except Exception:
-                    webbrowser.open_new("http://127.0.0.1:5056/")
-            else:
-                webbrowser.open_new("http://127.0.0.1:5056/")
-        except Exception as e:
-            print(
-                f"[AceForge] Failed to open browser automatically: {e}",
-                flush=True,
+                    # Start server (quiet mode reduces console output)
+                    serve(app, host="127.0.0.1", port=5056)
+                except Exception as e:
+                    print(f"[AceForge] Server error: {e}", flush=True)
+            
+            server_thread = threading.Thread(target=start_server, daemon=True)
+            server_thread.start()
+            
+            # Wait a moment for server to start
+            import time
+            time.sleep(0.5)
+            
+            # Create native window with pywebview
+            # Use the main UI URL (not loading page, as pywebview handles loading better)
+            window_url = "http://127.0.0.1:5056/"
+            
+            print("[AceForge] Opening native window with pywebview...", flush=True)
+            
+            # Create window with native macOS styling
+            window = webview.create_window(
+                title="AceForge - AI Music Generation",
+                url=window_url,
+                width=1400,
+                height=900,
+                min_size=(1000, 700),
+                resizable=True,
+                fullscreen=False,
+                # macOS-specific options
+                on_top=False,
+                shadow=True,
             )
+            
+            # Start the GUI event loop (this blocks until window is closed)
+            webview.start(debug=False)
+            
+            # When window closes, the server thread will also stop (daemon thread)
+            print("[AceForge] Window closed, shutting down...", flush=True)
+            
+        except ImportError:
+            # Fallback to browser if pywebview is not available
+            print("[AceForge] pywebview not available, falling back to browser...", flush=True)
+            import webbrowser
             try:
                 webbrowser.open_new("http://127.0.0.1:5056/")
             except Exception:
                 pass
-
-    # Start Flask (blocking)
-    serve(app, host="127.0.0.1", port=5056)
+            # Start Flask (blocking)
+            serve(app, host="127.0.0.1", port=5056)
+        except Exception as e:
+            print(f"[AceForge] Error with pywebview: {e}", flush=True)
+            print("[AceForge] Falling back to browser...", flush=True)
+            import webbrowser
+            try:
+                webbrowser.open_new("http://127.0.0.1:5056/")
+            except Exception:
+                pass
+            # Start Flask (blocking)
+            serve(app, host="127.0.0.1", port=5056)
+    else:
+        # Development mode: use browser
+        import webbrowser
+        try:
+            webbrowser.open_new("http://127.0.0.1:5056/")
+        except Exception:
+            pass
+        # Start Flask (blocking)
+        serve(app, host="127.0.0.1", port=5056)
 
 
 if __name__ == "__main__":

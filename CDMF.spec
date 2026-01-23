@@ -146,6 +146,8 @@ a = Analysis(
         'torchvision',
         'flask',
         'waitress',
+        'webview',  # pywebview for native window UI
+        'pywebview',  # pywebview package
         # Required by cdmf_pipeline_ace_step.py
         'loguru',
         'huggingface_hub',
