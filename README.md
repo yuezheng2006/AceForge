@@ -2,11 +2,10 @@
 
 # AceForge
 
-AceForge is a **local-first AI music workstation for macOS**. It runs on your Mac, uses Apple Metal (MPS) GPU acceleration, and keeps your prompts and audio on your hardware. AceForge is powered by **ACE-Step** (text → music diffusion) and includes a custom UI for generating tracks, managing a library, and training **LoRAs**.
+AceForge is a **local-first AI music workstation for macOS** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
+It runs on your Mac, uses Apple Silicon GPU acceleration, and keeps your prompts and audio on your own hardware. 
 
-This fork is optimized for macOS with Apple Metal support, designed for both Apple Silicon (M1/M2/M3) and Intel Macs.
-
-Status: **v0.1-macos**
+> Status: **ALPHA**
 
 ## What you can do
 
@@ -28,7 +27,6 @@ Status: **v0.1-macos**
 - 16 GB unified memory (for Apple Silicon) or 16 GB RAM
 - ~10–12 GB VRAM/unified memory (more = more headroom)
 - SSD with tens of GB free (models + audio + datasets)
-- Python 3.11 or later
 
 ### Recommended
 
@@ -37,11 +35,9 @@ Status: **v0.1-macos**
 - Fast SSD
 - Comfort reading terminal logs when something goes wrong
 
-**Note:** Apple Metal (MPS) support enables GPU acceleration on both Apple Silicon and Intel Macs with compatible AMD GPUs. Performance is optimized for Apple Silicon with unified memory architecture.
-
 ## Install and run
 
-### Option 1: Download Pre-built Release (Easiest)
+### Option 1: Download Pre-built Release for OSX
 
 Pre-built macOS application bundles are available from the [Releases page](https://github.com/audiohacking/AceForge/releases).
 
@@ -53,64 +49,13 @@ Pre-built macOS application bundles are available from the [Releases page](https
 **To Launch:**
 
 - Double-click `AceForge.app`
-- A Terminal window will open automatically showing server logs
-- Your browser will open automatically when the server is ready
-- Keep the Terminal window open while using AceForge
-- To stop: Press Ctrl+C in Terminal or use the "Exit" button in the browser
 
-**Note:** On first launch, macOS may show a security warning because the app is not notarized by Apple. Go to System Settings > Privacy & Security and click "Open Anyway". This is normal for apps downloaded from the internet that are not distributed through the Mac App Store.
+> **Note:** On first launch, macOS may show a security warning because the app is not notarized by Apple. Go to `System Settings > Privacy & Security` and click `Open Anyway`. This is normal for apps downloaded from the internet that are not distributed through the Mac App Store.
 
-**Note for older releases:** If macOS prevents the app from opening with a "damaged" error, this is due to lack of code signing in older builds. Either download a newer release (which includes code signing) or run: `sudo xattr -cr /Applications/AceForge.app`
+> **Note:** If macOS prevents the app from opening with a "damaged" error execute the following command:  
+```sudo xattr -cr /Applications/AceForge.app```
 
-**Note:** The app bundle does not include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
-
-### Option 2: Run from Source
-
-#### Prerequisites
-
-Ensure you have Python 3.11 or later installed:
-```bash
-# Check Python version
-python3 --version
-
-# If not installed, install via Homebrew
-brew install python@3.10
-```
-
-#### Installation
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/audiohacking/AceForge-Fork.git
-   cd AceForge-Fork
-   ```
-
-2. Make the launcher script executable:
-   ```bash
-   chmod +x CDMF.sh
-   ```
-
-3. Run the launcher:
-   ```bash
-   ./CDMF.sh
-   ```
-
-4. On first run, the script will:
-   - Create a Python virtual environment (`venv_ace`)
-   - Install packages from `requirements_ace_macos.txt`
-   - Download ACE-Step and related models as needed
-   - Install helpers like `audio-separator`
-   - Open the UI in your default browser
-
-The terminal window must remain open while AceForge is running. Press Ctrl+C to stop the server.
-
-On first run, AceForge does real setup work:
-- Creates a Python virtual environment (e.g. `venv_ace`)
-- Installs packages from `requirements_ace.txt`
-- Downloads ACE-Step and related models as needed
-- Installs helpers like `audio-separator`
-
-A console window (“server console”) appears and **must stay open** while AceForge runs. AceForge will open a loading page in your browser and then load the full UI when ready.
+> **Note:** The app bundle does NOT include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
 
 ## Using AceForge (high-level workflow)
 
@@ -183,42 +128,6 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
 
-### macOS-Specific
-
-- **MPS (Metal) backend errors**: 
-  - Ensure you're running macOS 12.0+ for MPS support
-  - Some operations may fall back to CPU if not yet supported on MPS
-  - Try setting `ACE_PIPELINE_DTYPE=float32` environment variable if you encounter precision issues:
-    ```bash
-    export ACE_PIPELINE_DTYPE=float32
-    ./CDMF.sh
-    ```
-
-- **Python version issues**:
-  ```bash
-  # Ensure you have Python 3.11 or later
-  python3 --version
-  
-  # Install via Homebrew if needed
-  brew install python@3.11
-  ```
-
-- **Permission denied when running CDMF.sh**:
-  ```bash
-  chmod +x CDMF.sh
-  ```
-
-- **Browser doesn't open automatically**: 
-  - Manually navigate to `http://127.0.0.1:5056/` in your browser
-  - Check if the terminal shows any error messages
-
-- **Virtual environment issues**:
-  ```bash
-  # Remove existing venv and recreate
-  rm -rf venv_ace
-  ./CDMF.sh
-  ```
-
 ## Performance Tips for Apple Silicon
 
 - **Unified memory management**: Apple Silicon Macs with unified memory can efficiently share memory between CPU and GPU
@@ -228,53 +137,8 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 
 ## Building Releases
 
-Pre-built macOS application bundles are automatically created via GitHub Actions. To build locally or create a new release:
+Pre-built macOS application bundles are automatically created via GitHub Actions. To build locally use the provided scripts.
 
-### Automated Build (GitHub Actions)
-
-1. Create a new release on GitHub
-2. The build workflow will automatically trigger
-3. DMG and ZIP files will be attached to the release
-
-Or manually trigger the build:
-```bash
-# Via GitHub Actions UI:
-# Go to Actions > Build macOS Release > Run workflow
-```
-
-### Manual Build (Local)
-
-Requirements:
-- macOS system with Python 3.11+
-- All dependencies installed (`requirements_ace_macos.txt`)
-
-Steps:
-```bash
-# Install dependencies
-pip install -r requirements_ace_macos.txt
-pip install "audio-separator==0.40.0" --no-deps
-pip install "py3langid==0.3.0" --no-deps
-pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps
-
-# Build with PyInstaller
-pyinstaller AceForge.spec
-
-# Code sign the app bundle (prevents "app is damaged" security warning)
-# For development, use ad-hoc signing (no certificate required):
-./build/macos/codesign.sh dist/AceForge.app
-
-# Or with a Developer ID certificate for distribution:
-# MACOS_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAM123)" \
-#   ./build/macos/codesign.sh dist/AceForge.app
-
-# The .app bundle will be in dist/AceForge.app
-
-# Optional: Create DMG
-hdiutil create -volname "AceForge" \
-  -srcfolder dist/AceForge.app \
-  -ov -format UDZO \
-  AceForge-macOS.dmg
-```
 
 **Code Signing:** The build includes automated code signing to prevent macOS security warnings that would otherwise require running `sudo xattr -cr /Applications/AceForge.app`. By default, the script uses ad-hoc signing (no Apple Developer certificate required). For distribution, you can provide a Developer ID certificate. See `build/macos/README.md` for detailed documentation on code signing options.
 
@@ -297,10 +161,4 @@ Issues and PRs welcome. If you’re changing anything related to training, model
 ## License
 
 This project’s **source code** is licensed under the **Apache License 2.0**. See `LICENSE`.
-## Trademarks
 
-This project was originally forked from a project with trademarked branding ("Candy Dungeon" and "Candy Dungeon Music Forge"). All such trademarked names and branding have been removed from this fork to comply with trademark regulations. This project is now known as "AceForge".
-
-## Support
-
-If you find AceForge useful and want to support development, you can open issues or contribute via pull requests on GitHub.
