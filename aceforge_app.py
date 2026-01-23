@@ -771,8 +771,22 @@ def main():
     # Determine HTML file path
     is_frozen = getattr(sys, 'frozen', False)
     if is_frozen:
-        # In frozen app, static files are in the bundle
-        base_path = Path(sys.executable).parent.parent / 'static'
+        # In frozen app, static files are in Resources (PyInstaller standard)
+        # Try multiple possible locations
+        exe_path = Path(sys.executable)
+        possible_paths = [
+            exe_path.parent.parent / 'Resources' / 'static',  # Standard PyInstaller location
+            exe_path.parent.parent / 'static',  # Alternative location
+            Path(sys._MEIPASS) / 'static',  # PyInstaller temp directory
+        ]
+        base_path = None
+        for path in possible_paths:
+            if path.exists():
+                base_path = path
+                break
+        if base_path is None:
+            # Fallback: use _MEIPASS if available
+            base_path = Path(sys._MEIPASS) / 'static' if hasattr(sys, '_MEIPASS') else exe_path.parent.parent / 'static'
     else:
         # In development, use project root
         base_path = Path(__file__).parent / 'static'
@@ -790,6 +804,24 @@ def main():
     
     print(f"[AceForge] Starting native window...", flush=True)
     print(f"[AceForge] HTML path: {html_path}", flush=True)
+    print(f"[AceForge] HTML exists: {html_path.exists()}", flush=True)
+    
+    if not html_path.exists():
+        error_msg = f"[AceForge] ERROR: HTML file not found at {html_path}"
+        print(error_msg, flush=True)
+        # Try to log to file
+        try:
+            log_dir = Path.home() / 'Library' / 'Logs' / 'AceForge'
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with open(log_dir / 'error.log', 'w') as f:
+                f.write(f"{error_msg}\n")
+                f.write(f"Base path: {base_path}\n")
+                f.write(f"Base path exists: {base_path.exists()}\n")
+                if base_path.exists():
+                    f.write(f"Files in base_path: {list(base_path.glob('*'))}\n")
+        except:
+            pass
+        raise FileNotFoundError(error_msg)
     
     # Create window with pywebview
     window = webview.create_window(
@@ -803,14 +835,18 @@ def main():
         fullscreen=False,
         on_top=False,
         shadow=True,
-        on_closed=lambda: sys.exit(0),
     )
     
     # Set window reference in API
     api.set_window(window)
     
     # Start the GUI event loop
+    # When window is closed, the event loop exits and we can clean up
     webview.start(debug=False)
+    
+    # Cleanup after window closes
+    print("[AceForge] Window closed, exiting...", flush=True)
+    sys.exit(0)
 
 
 if __name__ == '__main__':
@@ -824,5 +860,17 @@ if __name__ == '__main__':
             "\n"
             "The application will now exit.\n"
         )
+        # Write to a log file so we can debug even with console=False
+        try:
+            import os
+            from pathlib import Path
+            log_dir = Path.home() / 'Library' / 'Logs' / 'AceForge'
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / 'error.log'
+            with open(log_file, 'w') as f:
+                f.write(error_msg)
+            print(f"[AceForge] Error logged to: {log_file}", flush=True)
+        except:
+            pass
         print(error_msg, flush=True)
         sys.exit(1)
