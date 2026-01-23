@@ -23,31 +23,82 @@ if [ ! -f "CDMF.spec" ]; then
     exit 1
 fi
 
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
+# Check if Python is available (prefer 3.11, fallback to python3)
+PYTHON_CMD=""
+if command -v python3.11 &> /dev/null; then
+    PYTHON_CMD="python3.11"
+elif command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+    if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 11 ]; then
+        PYTHON_CMD="python3"
+    else
+        echo "⚠ Warning: Python $PYTHON_VERSION found, but Python 3.11+ is recommended."
+        echo "  Some dependencies may not work with Python 3.14+."
+        echo "  Consider installing Python 3.11: brew install python@3.11"
+        echo ""
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+        PYTHON_CMD="python3"
+    fi
+else
     echo "Error: python3 not found. Please install Python 3.11 or later."
     exit 1
 fi
 
-PYTHON_VERSION=$(python3 --version)
+# Check if we're in a virtual environment, or use venv_test if it exists
+if [ -z "$VIRTUAL_ENV" ]; then
+    if [ -d "venv_test" ]; then
+        echo "Activating venv_test virtual environment..."
+        source venv_test/bin/activate
+    elif [ -d "venv_ace" ]; then
+        echo "Activating venv_ace virtual environment..."
+        source venv_ace/bin/activate
+    else
+        echo "⚠ No virtual environment detected."
+        echo "  Creating venv_test..."
+        $PYTHON_CMD -m venv venv_test
+        source venv_test/bin/activate
+    fi
+else
+    echo "Using existing virtual environment: $VIRTUAL_ENV"
+fi
+
+# After venv activation, use 'python' command if available, otherwise use the original PYTHON_CMD
+if command -v python &> /dev/null; then
+    PYTHON_CMD="python"
+elif [ -n "$VIRTUAL_ENV" ] && [ -f "$VIRTUAL_ENV/bin/python" ]; then
+    PYTHON_CMD="$VIRTUAL_ENV/bin/python"
+fi
+
+PYTHON_VERSION=$($PYTHON_CMD --version)
 echo "Python: $PYTHON_VERSION"
 echo ""
 
 # Step 1: Check dependencies
 echo "Step 1: Checking dependencies..."
-if ! python3 -c "import PyInstaller" 2>/dev/null; then
+if ! $PYTHON_CMD -c "import PyInstaller" 2>/dev/null; then
     echo "⚠ PyInstaller not found."
     echo ""
     echo "Please install PyInstaller first:"
-    echo "  pip3 install pyinstaller==6.17.0"
-    echo ""
-    echo "Or if you're using a virtual environment:"
-    echo "  source venv_ace/bin/activate"
-    echo "  pip install pyinstaller==6.17.0"
+    if [ -n "$VIRTUAL_ENV" ]; then
+        echo "  pip install pyinstaller==6.17.0"
+    else
+        echo "  pip3 install pyinstaller==6.17.0"
+        echo ""
+        echo "Or create/activate a virtual environment:"
+        echo "  python3 -m venv venv_test"
+        echo "  source venv_test/bin/activate"
+        echo "  pip install pyinstaller==6.17.0"
+    fi
     echo ""
     exit 1
 else
-    PYINSTALLER_VERSION=$(python3 -c "import PyInstaller; print(PyInstaller.__version__)" 2>/dev/null || echo "unknown")
+    PYINSTALLER_VERSION=$($PYTHON_CMD -c "import PyInstaller; print(PyInstaller.__version__)" 2>/dev/null || echo "unknown")
     echo "✓ PyInstaller found (version: $PYINSTALLER_VERSION)"
 fi
 
@@ -59,7 +110,7 @@ if [ -d "dist/AceForge.app" ]; then
     rm -rf dist/AceForge.app
 fi
 
-pyinstaller CDMF.spec
+$PYTHON_CMD -m PyInstaller CDMF.spec
 
 if [ ! -d "dist/AceForge.app" ]; then
     echo "✗ Build failed: dist/AceForge.app not found"
@@ -154,7 +205,7 @@ echo ""
 
 # Check if models exist
 MODELS_EXIST=false
-if python3 -c "from ace_model_setup import get_ace_checkpoint_root, ACE_LOCAL_DIRNAME; from pathlib import Path; root = get_ace_checkpoint_root(); repo = root / ACE_LOCAL_DIRNAME; exit(0 if repo.exists() else 1)" 2>/dev/null; then
+if $PYTHON_CMD -c "from ace_model_setup import get_ace_checkpoint_root, ACE_LOCAL_DIRNAME; from pathlib import Path; root = get_ace_checkpoint_root(); repo = root / ACE_LOCAL_DIRNAME; exit(0 if repo.exists() else 1)" 2>/dev/null; then
     MODELS_EXIST=true
     echo "✓ Models found, proceeding with generation test..."
 else
