@@ -464,6 +464,8 @@ def main() -> None:
     # This prevents aceforge_app.py or any other importer from triggering window creation
     if __name__ != "__main__":
         print(f"[AceForge] BLOCKED: music_forge_ui.main() called but __name__={__name__} (not '__main__')", flush=True)
+        import traceback
+        print(f"[AceForge] music_forge_ui.main() call stack:\n{''.join(traceback.format_stack()[-10:])}", flush=True)
         return
     
     # Additional safety check: If this module was imported (not run directly), don't execute
