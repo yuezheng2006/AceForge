@@ -176,6 +176,14 @@
   function applySettingsToForm(settings) {
     if (!settings) return;
 
+    // Voice Clone tracks: switch to Voice Clone tab and fill that form
+    if (settings.generator === "voice_clone") {
+      if (typeof CDMF.applyVoiceCloneSettingsToForm === "function") {
+        CDMF.applyVoiceCloneSettingsToForm(settings);
+        return;
+      }
+    }
+
     const promptField = document.getElementById("prompt");
     const lyricsField = document.getElementById("lyrics");
     const instrumentalCheckbox = document.getElementById("instrumental");

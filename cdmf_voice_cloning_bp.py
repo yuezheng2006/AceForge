@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict
+import time
 import traceback
 import logging
+from pathlib import Path
+from typing import Any, Dict
 
 from flask import Blueprint, request, render_template_string, jsonify
 from werkzeug.utils import secure_filename
@@ -124,10 +125,41 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                 # Clean up temporary reference file
                 if temp_ref_path.exists():
                     temp_ref_path.unlink()
-                
+
+                # Save track metadata (seconds, generator, voice clone params) for Music Player
+                # and "copy generation settings back to form"
+                try:
+                    from pydub import AudioSegment
+
+                    final_name = Path(result_path).name
+                    dur = len(AudioSegment.from_file(str(result_path))) / 1000.0
+                    track_meta = cdmf_tracks.load_track_meta()
+                    entry = track_meta.get(final_name, {})
+                    if "favorite" not in entry:
+                        entry["favorite"] = False
+                    entry["seconds"] = dur
+                    entry["created"] = time.time()
+                    entry["generator"] = "voice_clone"
+                    entry["basename"] = Path(final_name).stem
+                    entry["text"] = text
+                    entry["language"] = language
+                    entry["temperature"] = temperature
+                    entry["length_penalty"] = length_penalty
+                    entry["repetition_penalty"] = repetition_penalty
+                    entry["top_k"] = top_k
+                    entry["top_p"] = top_p
+                    entry["speed"] = speed
+                    entry["enable_text_splitting"] = enable_text_splitting
+                    entry["device_preference"] = device_preference
+                    entry["out_dir"] = str(out_dir_path)
+                    track_meta[final_name] = entry
+                    cdmf_tracks.save_track_meta(track_meta)
+                except Exception as e:
+                    logger.warning("[Voice Cloning] Failed to save track metadata: %s", e)
+
                 # Get updated track list
                 tracks = cdmf_tracks.list_music_files()
-                
+
                 logger.info(f"[Voice Cloning] Success: {result_path}")
                 
                 return jsonify({

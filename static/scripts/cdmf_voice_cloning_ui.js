@@ -114,10 +114,53 @@
   CDMF.syncVoiceCloneOutputDir = function () {
     var outDirSettings = document.getElementById("out_dir_settings");
     var outDirVoiceClone = document.getElementById("voice_clone_out_dir");
-    
+
     if (outDirSettings && outDirVoiceClone) {
       outDirVoiceClone.value = outDirSettings.value;
     }
+  };
+
+  // Apply voice clone track metadata into the Voice Clone form (used by "copy settings" in Music Player)
+  CDMF.applyVoiceCloneSettingsToForm = function (settings) {
+    if (!settings) return;
+
+    if (typeof CDMF.switchMode === "function") {
+      CDMF.switchMode("voice_clone");
+    }
+
+    function setVal(id, v) {
+      var el = document.getElementById(id);
+      if (el && v != null && v !== "") {
+        el.value = String(v);
+      }
+    }
+
+    function setNumPair(numId, rangeId, v) {
+      if (v == null || Number.isNaN(v)) return;
+      var s = String(v);
+      var num = document.getElementById(numId);
+      var rng = document.getElementById(rangeId);
+      if (num) num.value = s;
+      if (rng) rng.value = s;
+    }
+
+    setVal("voice_clone_text", settings.text);
+    setVal("voice_clone_output_filename", settings.basename);
+    setVal("voice_clone_language", settings.language);
+    setVal("voice_clone_device", settings.device_preference);
+    setNumPair("voice_clone_temperature", "voice_clone_temperature_range", settings.temperature);
+    setNumPair("voice_clone_length_penalty", "voice_clone_length_penalty_range", settings.length_penalty);
+    setNumPair("voice_clone_repetition_penalty", "voice_clone_repetition_penalty_range", settings.repetition_penalty);
+    setVal("voice_clone_top_k", settings.top_k);
+    setNumPair("voice_clone_top_p", "voice_clone_top_p_range", settings.top_p);
+    setNumPair("voice_clone_speed", "voice_clone_speed_range", settings.speed);
+
+    var cb = document.getElementById("voice_clone_enable_text_splitting");
+    if (cb && typeof settings.enable_text_splitting === "boolean") {
+      cb.checked = settings.enable_text_splitting;
+    }
+
+    setVal("voice_clone_out_dir", settings.out_dir);
   };
 
   // Initialize on DOM ready
