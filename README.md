@@ -6,6 +6,9 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 > Status: **ALPHA**
 
+<img width="779" height="588" alt="image" src="https://github.com/user-attachments/assets/bd520fcb-7c79-450e-8613-6e30a252a8ca" />
+
+
 ## Features
 
 - 100% Local _(only needs to download models once)_
@@ -40,7 +43,7 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 ### Option 1: Download Pre-built Release for OSX
 
-Pre-built macOS application bundles are available from the [Releases page](https://github.com/audiohacking/AceForge/releases).
+[Download](https://github.com/audiohacking/AceForge/releases/latest/download/AceForge-macOS.dmg) the latest App from the [Releases page](https://github.com/audiohacking/AceForge/releases).
 
 **Installation:**
 1. Download `AceForge-macOS.dmg` from the latest release
@@ -141,13 +144,6 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
   - Reduce target length during generation
   - Reduce max clip seconds during training
   - Lower batch/grad accumulation if you changed them
-
-## Performance Tips for Apple Silicon
-
-- **Unified memory management**: Apple Silicon Macs with unified memory can efficiently share memory between CPU and GPU
-- **Batch sizes**: Start with smaller batch sizes and gradually increase to find optimal performance
-- **Model precision**: The pipeline automatically selects appropriate precision for MPS (float32 instead of bfloat16)
-- **Generation length**: Longer generation times may require more memory; start with shorter durations and scale up
 
 ## Building Releases
 
