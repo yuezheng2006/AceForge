@@ -38,6 +38,61 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
 if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' not in os.environ:
     os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
 
+# CRITICAL for frozen apps: Disable TorchScript JIT compilation
+# TorchScript requires source file access which isn't available in PyInstaller bundles
+# This must be set BEFORE importing torch or TTS
+os.environ.setdefault("TORCH_JIT", "0")  # Disable JIT compilation
+os.environ.setdefault("PYTORCH_JIT", "0")  # Alternative env var
+# Skip TTS Coqui TOS interactive prompt (avoids "EOF when reading a line" when stdin is closed in GUI)
+os.environ.setdefault("COQUI_TOS_AGREED", "1")
+
+# CRITICAL for Voice Cloning in frozen apps: .py source isn't in the bundle, so
+# inspect.findsource (and thus getsourcelines/getsourcefile/getsource) can raise
+# OSError('could not get source code') when linecache.getlines returns [].
+# Patch findsource (the lowest-level raiser) and the common entry points.
+if getattr(sys, "frozen", False) or hasattr(sys, "_MEIPASS"):
+    import inspect
+    _orig_findsource = inspect.findsource
+    _orig_gl = inspect.getsourcelines
+    _orig_gf = inspect.getsourcefile
+    _orig_src = getattr(inspect, "getsource", None)
+
+    _FROZEN_DUMMY = (["def _frozen_placeholder(*a, **k):\n", "    pass\n"], 1)
+
+    def _patched_findsource(obj):
+        try:
+            return _orig_findsource(obj)
+        except OSError:
+            return _FROZEN_DUMMY
+
+    def _patched_getsourcelines(obj):
+        try:
+            return _orig_gl(obj)
+        except OSError:
+            return _FROZEN_DUMMY
+
+    def _patched_getsourcefile(obj):
+        try:
+            return _orig_gf(obj)
+        except OSError:
+            return "<frozen>"
+
+    def _patched_getsource(obj):
+        try:
+            if _orig_src:
+                return _orig_src(obj)
+            lines, _ = _orig_gl(obj)
+            return "".join(lines)
+        except OSError:
+            return "def _frozen_placeholder(*a, **k):\n    pass\n"
+
+    inspect.findsource = _patched_findsource
+    inspect.getsourcelines = _patched_getsourcelines
+    inspect.getsourcefile = _patched_getsourcefile
+    if _orig_src:
+        inspect.getsource = _patched_getsource
+    print("[AceForge] Patched inspect for frozen app (findsource, getsourcelines, getsourcefile, getsource).", flush=True)
+
 # Critical: Import lzma EARLY (before any ACE-Step imports)
 try:
     import lzma

@@ -44,11 +44,18 @@ fi
 echo "✓ PyInstaller found"
 echo ""
 
-# Clean previous builds
+# Clean previous builds (PyInstaller outputs only).
+# NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
 echo "Cleaning previous builds..."
 rm -rf dist/AceForge.app dist/CDMF build/AceForge
 echo "✓ Cleaned"
 echo ""
+
+if [ ! -f "build/macos/AceForge.icns" ]; then
+    echo "✗ ERROR: build/macos/AceForge.icns not found. build/macos/ must never be deleted."
+    echo "  Restore from main: git checkout main -- build/macos/"
+    exit 1
+fi
 
 # Build the app
 echo "Building bundled app with PyInstaller..."

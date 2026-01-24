@@ -168,6 +168,7 @@ from cdmf_mufun import create_mufun_blueprint
 from cdmf_training import create_training_blueprint
 from cdmf_generation import create_generation_blueprint
 from cdmf_lyrics import create_lyrics_blueprint
+# Voice cloning import is optional - handled in blueprint registration below
 
 # Global flag to prevent main() from running when imported
 _MUSIC_FORGE_UI_IMPORTED = False
@@ -359,6 +360,13 @@ app.register_blueprint(
     )
 )
 app.register_blueprint(create_lyrics_blueprint())
+# Register voice cloning blueprint (optional component)
+try:
+    from cdmf_voice_cloning_bp import create_voice_cloning_blueprint
+    app.register_blueprint(create_voice_cloning_blueprint(html_template=HTML))
+except (ImportError, Exception) as e:
+    # Voice cloning is optional - if TTS library is not installed, skip it
+    print(f"[AceForge] Voice cloning not available: {e}", flush=True)
 
 
 

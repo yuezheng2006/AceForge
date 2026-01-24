@@ -3,7 +3,7 @@
 # AceForge
 
 AceForge is a **local-first AI music workstation for macOS** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
-It runs on your Mac, uses Apple Silicon GPU acceleration, and keeps your prompts and audio on your own hardware. 
+It runs on your Mac, uses Apple Silicon GPU acceleration and keeps your prompts and audio local. 
 
 > Status: **ALPHA**
 
@@ -13,6 +13,7 @@ It runs on your Mac, uses Apple Silicon GPU acceleration, and keeps your prompts
 - Use a built-in **Music Player + library view** (sort, favorite, categorize)
 - Save and reuse **presets**
 - (Optional) **Stem separation** to rebalance vocals vs instrumentals
+- **Voice cloning** (XTTS v2): clone a voice from a short reference (MP3/WAV/M4A/FLAC), synthesize speech, and save as MP3 256k
 - Train **ACE-Step LoRAs** from your own datasets
 - Dataset helpers:
   - Mass-create `_prompt.txt` / `_lyrics.txt` files
@@ -63,8 +64,9 @@ Pre-built macOS application bundles are available from the [Releases page](https
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
 4. (Optional) Use stem controls to adjust vocal/instrumental balance
-5. (Optional) Build a dataset and train a LoRA in **Training**
-6. **To Exit**: Click the "Exit" button in the top-right corner or press Ctrl+C in the terminal
+5. (Optional) **Voice Clone**: TTS voice cloning using reference clips
+6. (Optional) Build a dataset and train a LoRA in **Training**
+
 
 
 ## Generation basics
@@ -84,6 +86,10 @@ AceForge can run `audio-separator` as a post-process step so you can rebalance:
 - Instrumental level (dB)
 
 First use requires downloading a **large** stem model and adds a heavy processing step. For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
+
+## Voice cloning (XTTS v2)
+
+The **Voice Clone** tab uses Coqui TTS (XTTS v2) to synthesize speech in a cloned voice. Upload a short reference (MP3, WAV, M4A, or FLAC), enter the text, and generate. Output is saved as MP3 256k and appears in the Music Player. On first use, the XTTS model (~1.9 GB) is downloaded automatically. **ffmpeg** must be installed (e.g. `brew install ffmpeg`) for non-WAV references.
 
 ## LoRA training
 
@@ -122,7 +128,7 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 ### Common Issues
 
 - **First launch takes forever**: Check terminal for pip/model download errors; verify disk space and network
-- **No .wav files found**: Generate a track; confirm Output Directory matches the Music Player folder
+- **No tracks found**: Generate a track or run Voice Clone; confirm Output Directory matches the Music Player folder
 - **Memory issues**: 
   - Reduce target length during generation
   - Reduce max clip seconds during training

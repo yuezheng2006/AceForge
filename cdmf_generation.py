@@ -580,6 +580,7 @@ def create_generation_blueprint(
                     "lora_name_or_path", lora_name_or_path
                 )
                 entry["lora_weight"] = summary.get("lora_weight", lora_weight)
+                entry["generator"] = "ace_step"
 
                 meta[wav_path.name] = entry
                 cdmf_tracks.save_track_meta(meta)
