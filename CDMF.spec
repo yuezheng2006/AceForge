@@ -340,7 +340,7 @@ app = BUNDLE(
         'NSAppTransportSecurity': {
             'NSAllowsLocalNetworking': True,  # Allow localhost connections for Flask
         },
-        # The main executable will be the wrapper script added by build workflow
+        # CFBundleExecutable: build_local and build-release.yml copy AceForge_bin→AceForge
         'CFBundleExecutable': 'AceForge',
     },
 )
