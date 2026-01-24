@@ -43,7 +43,7 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 ### Option 1: Download Pre-built Release for OSX
 
-Pre-built macOS application bundles are available from the [Releases page](https://github.com/audiohacking/AceForge/releases).
+[Download](https://github.com/audiohacking/AceForge/releases/latest/download/AceForge-macOS.dmg) the latest App from the [Releases page](https://github.com/audiohacking/AceForge/releases).
 
 **Installation:**
 1. Download `AceForge-macOS.dmg` from the latest release
