@@ -85,11 +85,19 @@ AceForge can run `audio-separator` as a post-process step so you can rebalance:
 - Vocals level (dB)
 - Instrumental level (dB)
 
-First use requires downloading a **large** stem model and adds a heavy processing step. For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
+For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
+
+> First use requires downloading a **large** stem model and adds a heavy processing step 
 
 ## Voice cloning (XTTS v2)
 
-The **Voice Clone** tab uses Coqui TTS (XTTS v2) to synthesize speech in a cloned voice. Upload a short reference (MP3, WAV, M4A, or FLAC), enter the text, and generate. Output is saved as MP3 256k and appears in the Music Player. On first use, the XTTS model (~1.9 GB) is downloaded automatically. **ffmpeg** must be installed (e.g. `brew install ffmpeg`) for non-WAV references.
+The **Voice Clone** uses `XTTS v2` to synthesize speech in a cloned voice
+- Upload a short reference _(MP3, WAV)_, enter the text and generate.
+- Output is converted to MP3 and displayed in the Music Player
+
+**ffmpeg** must be installed (e.g. `brew install ffmpeg`) for non-WAV references.
+
+> First use requires downloading a **large** XTTS model (~1.9 GB) please be patient
 
 ## LoRA training
 
