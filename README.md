@@ -7,17 +7,18 @@ It runs on your Mac, uses Apple Silicon GPU acceleration and keeps your prompts 
 
 > Status: **ALPHA**
 
-## What you can do
+## Features
 
-- Generate music from a **prompt** (optionally with **lyrics**)
-- Use a built-in **Music Player + library view** (sort, favorite, categorize)
-- Save and reuse **presets**
-- (Optional) **Stem separation** to rebalance vocals vs instrumentals
-- **Voice cloning** (XTTS v2): clone a voice from a short reference (MP3/WAV/M4A/FLAC), synthesize speech, and save as MP3 256k
-- Train **ACE-Step LoRAs** from your own datasets
-- Dataset helpers:
-  - Mass-create `_prompt.txt` / `_lyrics.txt` files
-  - (Optional) Auto-tag datasets using **MuFun-ACEStep** (experimental)
+- 100% Local _(only needs to download models once)_
+- Music Generation with **ACE-Step** prompts
+  - Use **Stem separation** to rebalance vocals vs instrumentals
+  - Use existing **Audio** as reference _(optional)_ 
+  - Train **ACE-Step LoRAs** from your own datasets
+    - Mass-create `_prompt.txt` / `_lyrics.txt` files
+    - Auto-tag datasets using **MuFun-ACEStep** _(experimental)_
+- Voice Cloning TTS using **XTTS v2**
+- Embedded **Music Player** to explore generation catalog
+- Manage and reuse **prompt presets**
 
 ## System requirements
 
