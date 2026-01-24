@@ -110,11 +110,70 @@ try:
 except Exception as e:
     print(f"[CDMF.spec] WARNING: collect_data_files('tokenizers') failed: {e}")
 
+# Collect data files for TTS (voice cloning - optional component)
+_tts_data = []
+try:
+    _tts_data = collect_data_files('TTS')
+    if _tts_data:
+        print(f"[CDMF.spec] Collected TTS data files: {len(_tts_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('TTS') failed: {e} (TTS may not be installed)")
+
+# TTS/vocoder/configs/__init__.py runs os.listdir(os.path.dirname(__file__)) at import; that dir must exist on disk.
+# collect_data_files does not include .py; add vocoder configs as datas so .../TTS/vocoder/configs/ exists.
+_tts_vocoder_configs = []
+try:
+    import TTS.vocoder.configs as _voc_cfg
+    _vcd = os.path.dirname(_voc_cfg.__file__)
+    for _f in os.listdir(_vcd):
+        if _f.endswith(".py"):
+            _tts_vocoder_configs.append((os.path.join(_vcd, _f), "TTS/vocoder/configs"))
+    if _tts_vocoder_configs:
+        print(f"[CDMF.spec] Collected TTS/vocoder/configs: {len(_tts_vocoder_configs)} .py files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: TTS vocoder configs: {e} (TTS may not be installed)")
+
+# Collect data files for trainer (TTS dependency - includes VERSION file)
+_trainer_data = []
+try:
+    _trainer_data = collect_data_files('trainer')
+    if _trainer_data:
+        print(f"[CDMF.spec] Collected trainer data files: {len(_trainer_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('trainer') failed: {e} (trainer may not be installed)")
+
+# Collect data files for gruut (TTS phonemizer - must include VERSION; else "No such file or directory: .../gruut/VERSION")
+_gruut_data = []
+try:
+    _gruut_data = collect_data_files('gruut')
+    if _gruut_data:
+        print(f"[CDMF.spec] Collected gruut data files: {len(_gruut_data)} files (incl. VERSION)")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('gruut') failed: {e} (TTS/gruut may not be installed)")
+
+# Collect data files for jamo (TTS/Korean phonemizer - needs data/U+11xx.json, U+31xx.json)
+_jamo_data = []
+try:
+    _jamo_data = collect_data_files('jamo')
+    if _jamo_data:
+        print(f"[CDMF.spec] Collected jamo data files: {len(_jamo_data)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_data_files('jamo') failed: {e} (TTS/jamo may not be installed)")
+
+# Collect dynamic libraries for TTS (if available)
+_tts_binaries = []
+try:
+    _tts_binaries = collect_dynamic_libs('TTS')
+    if _tts_binaries:
+        print(f"[CDMF.spec] Collected TTS binaries: {len(_tts_binaries)} files")
+except Exception as e:
+    print(f"[CDMF.spec] WARNING: collect_dynamic_libs('TTS') failed: {e} (TTS may not be installed)")
+
 a = Analysis(
     ['aceforge_app.py'],
     pathex=[],
-    binaries=_lzma_binaries + _tokenizers_binaries + [
-        # _lzma and tokenizers binaries are collected above
+    binaries=_lzma_binaries + _tokenizers_binaries + _tts_binaries + [
+        # _lzma, tokenizers, and TTS binaries are collected above
         # Additional binaries can be added here if needed
     ],
     datas=[
@@ -130,7 +189,7 @@ a = Analysis(
         ('presets.json', '.'),
         # Include VERSION file (placed in MacOS directory for frozen apps)
         ('VERSION', '.'),
-    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data,
+    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data,
     hiddenimports=[
         'diffusers',
         'diffusers.loaders',
@@ -178,6 +237,7 @@ a = Analysis(
         'pytorch_lightning',
         'librosa',
         'soundfile',
+        'pydub',  # Voice cloning: convert MP3/M4A/FLAC to WAV for TTS
         'einops',
         'rotary_embedding_torch',
         # Tokenizers library (required by VoiceBpeTokenizer)
@@ -193,6 +253,22 @@ a = Analysis(
         # Standard library modules that PyInstaller sometimes misses
         'lzma',  # Required by py3langid for loading pickled models
         '_lzma',  # C extension for lzma (required on some systems)
+        # Voice cloning (TTS library - must be installed in build env and in hiddenimports)
+        'cdmf_voice_cloning',
+        'cdmf_voice_cloning_bp',
+        'TTS',
+        'TTS.api',
+        # Collect all TTS submodules (critical for frozen apps)
+        *collect_submodules('TTS'),
+        # TTS dependencies that might be missed by PyInstaller
+        'coqpit',
+        'trainer',
+        'pysbd',
+        'inflect',
+        'unidecode',
+        'anyascii',  # Required by TTS.tts.utils.text
+        'bangla',  # Required by TTS.tts.utils.text.phonemizers (Bangla)
+        'jamo',  # Required by TTS/Korean phonemizer (needs data/*.json)
     ],
     hookspath=['build/macos/pyinstaller_hooks'],  # Custom hooks for frozen app compatibility
     hooksconfig={},

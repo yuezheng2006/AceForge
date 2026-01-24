@@ -103,14 +103,15 @@ def save_user_presets(data: Dict[str, Any]) -> None:
 
 
 def list_music_files() -> List[str]:
-    """Return a sorted list of .wav files in the default music directory."""
+    """Return a sorted list of .wav and .mp3 files in the default music directory."""
     music_dir = Path(DEFAULT_OUT_DIR)
     if not music_dir.exists():
         return []
-    return sorted(
-        [p.name for p in music_dir.glob("*.wav") if p.is_file()],
-        key=lambda name: name.lower(),
-    )
+    names = [
+        p.name for p in music_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in (".wav", ".mp3")
+    ]
+    return sorted(names, key=lambda n: n.lower())
 
 
 def list_lora_adapters() -> List[Dict[str, Any]]:
@@ -205,7 +206,7 @@ def create_tracks_blueprint() -> Blueprint:
     @bp.route("/tracks.json", methods=["GET"])
     def tracks_json():
         """
-        JSON list of available .wav tracks plus the most recently generated one
+        JSON list of available .wav and .mp3 tracks plus the most recently generated one
         (if known). Used by the front-end after a generation finishes.
         """
         tracks = list_music_files()

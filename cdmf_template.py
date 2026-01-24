@@ -42,7 +42,7 @@ HTML = r"""
     <div class="two-column-layout">
       <!-- Left column: Generation and Training -->
       <div class="column-left">
-        <!-- Mode tabs: Generate vs Training ---------------------------------- -->
+        <!-- Mode tabs: Generate vs Training vs Voice Cloning ---------------------------------- -->
         <div class="tab-row" style="margin-top:16px;">
           <button
             type="button"
@@ -57,6 +57,13 @@ HTML = r"""
             data-mode="train"
             onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('train');">
             Training
+          </button>
+          <button
+            type="button"
+            class="tab-btn mode-tab-btn"
+            data-mode="voice_clone"
+            onclick="window.CDMF && CDMF.switchMode && CDMF.switchMode('voice_clone');">
+            Voice Cloning
           </button>
         </div>
 
@@ -719,6 +726,180 @@ HTML = r"""
         </div>
       </div>
     </div>
+
+        <!-- Voice Cloning form card (mode: voice_clone) ----------------------------- -->
+        <form
+          id="voiceCloneForm"
+          class="card card-mode"
+          data-mode="voice_clone"
+          method="post"
+          action="{{ url_for('cdmf_voice_cloning.voice_clone') }}"
+          enctype="multipart/form-data"
+          onsubmit="return CDMF.onSubmitVoiceClone(event)"
+          style="display:none;">
+          <div class="card-header-row">
+            <div style="flex:1;min-width:0;">
+              <h2>Voice Cloning</h2>
+              <div id="voiceCloneLoadingBar" class="loading-bar" style="display:none;">
+                <div class="loading-bar-inner"></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="voiceCloneButton" type="submit" class="btn primary">
+                <span class="icon">🎤</span><span>Clone Voice</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="small" style="margin-top:8px;margin-bottom:16px;">
+            Clone a voice from a reference audio file using XTTS v2. Upload a reference audio file (MP3/WAV) and enter text to synthesize.
+          </div>
+
+          <div class="row">
+            <label for="voice_clone_text">Text to Synthesize</label>
+            <textarea
+              id="voice_clone_text"
+              name="text"
+              rows="4"
+              placeholder="Enter the text you want to synthesize in the cloned voice..."
+              required></textarea>
+          </div>
+
+          <div class="row">
+            <label for="speaker_wav">Reference Audio File</label>
+            <input
+              id="speaker_wav"
+              name="speaker_wav"
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.flac"
+              required>
+            <div class="small">
+              Upload a reference audio file (MP3, WAV, M4A, or FLAC) containing the voice you want to clone.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="voice_clone_output_filename">Output Filename</label>
+            <input
+              id="voice_clone_output_filename"
+              name="output_filename"
+              type="text"
+              placeholder="voice_clone_output"
+              value="voice_clone_output">
+            <div class="small">
+              Output filename (without extension). Will be saved as .wav in the output directory.
+            </div>
+          </div>
+
+          <div class="row">
+            <label for="voice_clone_language">Language</label>
+            <select id="voice_clone_language" name="language">
+              <option value="en" selected>English</option>
+              <option value="es">Spanish</option>
+              <option value="fr">French</option>
+              <option value="de">German</option>
+              <option value="it">Italian</option>
+              <option value="pt">Portuguese</option>
+              <option value="pl">Polish</option>
+              <option value="tr">Turkish</option>
+              <option value="ru">Russian</option>
+              <option value="nl">Dutch</option>
+              <option value="cs">Czech</option>
+              <option value="ar">Arabic</option>
+              <option value="zh-cn">Chinese (Simplified)</option>
+              <option value="ja">Japanese</option>
+              <option value="hu">Hungarian</option>
+              <option value="ko">Korean</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label for="voice_clone_device">Device</label>
+            <select id="voice_clone_device" name="device_preference">
+              <option value="auto" selected>Auto (MPS if available, else CPU)</option>
+              <option value="mps">Apple Silicon GPU (MPS)</option>
+              <option value="cpu">CPU</option>
+            </select>
+            <div class="small">
+              Device selection for voice cloning. On M2/M3 Macs, CPU can be surprisingly fast and may avoid MPS artifacts.
+              First generation is slower (compiles execution graph), subsequent generations are faster.
+            </div>
+          </div>
+
+          <hr style="border:none;border-top:1px solid #111827;margin:16px 0 8px;">
+
+          <div class="small" style="font-weight:600;opacity:0.9;margin-bottom:8px;">
+            Advanced Parameters
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_temperature">Temperature</label>
+            <input id="voice_clone_temperature_range" type="range" min="0.0" max="1.0" step="0.01"
+                   value="0.75" oninput="CDMF.syncRange('voice_clone_temperature', 'voice_clone_temperature_range')">
+            <input id="voice_clone_temperature" name="temperature" type="number" min="0.0" max="1.0" step="0.01"
+                   value="0.75" oninput="CDMF.syncNumber('voice_clone_temperature', 'voice_clone_temperature_range')">
+            <div class="small">Sampling temperature. Lower values produce more deterministic output.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_length_penalty">Length Penalty</label>
+            <input id="voice_clone_length_penalty_range" type="range" min="0.0" max="2.0" step="0.1"
+                   value="1.0" oninput="CDMF.syncRange('voice_clone_length_penalty', 'voice_clone_length_penalty_range')">
+            <input id="voice_clone_length_penalty" name="length_penalty" type="number" min="0.0" max="2.0" step="0.1"
+                   value="1.0" oninput="CDMF.syncNumber('voice_clone_length_penalty', 'voice_clone_length_penalty_range')">
+            <div class="small">Length penalty for generation.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_repetition_penalty">Repetition Penalty</label>
+            <input id="voice_clone_repetition_penalty_range" type="range" min="0.0" max="10.0" step="0.1"
+                   value="5.0" oninput="CDMF.syncRange('voice_clone_repetition_penalty', 'voice_clone_repetition_penalty_range')">
+            <input id="voice_clone_repetition_penalty" name="repetition_penalty" type="number" min="0.0" max="10.0" step="0.1"
+                   value="5.0" oninput="CDMF.syncNumber('voice_clone_repetition_penalty', 'voice_clone_repetition_penalty_range')">
+            <div class="small">Penalty for repeating tokens. Higher values reduce repetition.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_top_k">Top-K</label>
+            <input id="voice_clone_top_k" name="top_k" type="number" min="1" max="100" step="1"
+                   value="50">
+            <div class="small">Top-K sampling parameter.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_top_p">Top-P</label>
+            <input id="voice_clone_top_p_range" type="range" min="0.0" max="1.0" step="0.01"
+                   value="0.85" oninput="CDMF.syncRange('voice_clone_top_p', 'voice_clone_top_p_range')">
+            <input id="voice_clone_top_p" name="top_p" type="number" min="0.0" max="1.0" step="0.01"
+                   value="0.85" oninput="CDMF.syncNumber('voice_clone_top_p', 'voice_clone_top_p_range')">
+            <div class="small">Nucleus sampling parameter.</div>
+          </div>
+
+          <div class="slider-row">
+            <label for="voice_clone_speed">Speed</label>
+            <input id="voice_clone_speed_range" type="range" min="0.25" max="4.0" step="0.05"
+                   value="1.0" oninput="CDMF.syncRange('voice_clone_speed', 'voice_clone_speed_range')">
+            <input id="voice_clone_speed" name="speed" type="number" min="0.25" max="4.0" step="0.05"
+                   value="1.0" oninput="CDMF.syncNumber('voice_clone_speed', 'voice_clone_speed_range')">
+            <div class="small">Speech speed multiplier (0.25x to 4.0x).</div>
+          </div>
+
+          <div class="row">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input
+                id="voice_clone_enable_text_splitting"
+                name="enable_text_splitting"
+                type="checkbox"
+                checked>
+              Enable Text Splitting
+            </label>
+            <div class="small">Automatically split long text into sentences for better quality.</div>
+          </div>
+
+          <!-- Hidden field for output directory (synced from Settings) -->
+          <input id="voice_clone_out_dir" name="out_dir" type="hidden" value="{{ default_out_dir or '' }}">
+
+        </form>
 
         <!-- Training card: ACE-Step LoRA skeleton (mode: train) --------------- -->
         <form
@@ -1713,6 +1894,7 @@ HTML = r"""
   <script src="{{ url_for('static', filename='scripts/cdmf_mode_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_training_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_mufun_ui.js') }}"></script>
+  <script src="{{ url_for('static', filename='scripts/cdmf_voice_cloning_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_lora_ui.js') }}"></script>
   <script src="{{ url_for('static', filename='scripts/cdmf_console.js') }}"></script>
 </body>

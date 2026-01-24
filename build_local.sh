@@ -53,40 +53,65 @@ fi
 echo "[Build] Activating virtual environment..."
 source "${VENV_DIR}/bin/activate"
 
+# Use venv Python for all installs and PyInstaller (ensures TTS and deps are in the bundle)
+PY="${VENV_PY}"
+
 # Upgrade pip
 echo "[Build] Upgrading pip..."
-$PYTHON_CMD -m pip install --upgrade pip --quiet
+"$PY" -m pip install --upgrade pip --quiet
 
 # Install dependencies
 echo "[Build] Installing dependencies..."
-$PYTHON_CMD -m pip install -r requirements_ace_macos.txt --quiet
+"$PY" -m pip install -r requirements_ace_macos.txt --quiet
 
 # Install additional dependencies
 echo "[Build] Installing additional dependencies..."
-$PYTHON_CMD -m pip install "audio-separator==0.40.0" --no-deps --quiet
-$PYTHON_CMD -m pip install "py3langid==0.3.0" --no-deps --quiet
-$PYTHON_CMD -m pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps --quiet
-$PYTHON_CMD -m pip install "rotary_embedding_torch" --quiet
-$PYTHON_CMD -m pip install "pyinstaller>=6.0" --quiet
+"$PY" -m pip install "audio-separator==0.40.0" --no-deps --quiet
+"$PY" -m pip install "py3langid==0.3.0" --no-deps --quiet
+"$PY" -m pip install "git+https://github.com/ace-step/ACE-Step.git" --no-deps --quiet
+"$PY" -m pip install "rotary_embedding_torch" --quiet
+
+# Install TTS for voice cloning (required for frozen app; build fails if TTS cannot be imported)
+# TTS 0.21.2 needs its full dependency tree (phonemizers etc.); --no-deps breaks "from TTS.api import TTS"
+echo "[Build] Installing TTS for voice cloning..."
+"$PY" -m pip install "coqpit" "trainer>=0.0.32" "pysbd>=0.3.4" "inflect>=5.6.0" "unidecode>=1.3.2" --quiet
+"$PY" -m pip install "TTS==0.21.2" --quiet
+if ! "$PY" -c "from TTS.api import TTS" 2>/dev/null; then
+    echo "[Build] ERROR: TTS installed but 'from TTS.api import TTS' failed. Voice cloning will not work in the app."
+    echo "[Build] Run: $PY -c \"from TTS.api import TTS\" to see the error."
+    "$PY" -c "from TTS.api import TTS" || true
+    exit 1
+fi
+echo "[Build] TTS verified: from TTS.api import TTS OK"
+
+"$PY" -m pip install "pyinstaller>=6.0" --quiet
 
 # Check for PyInstaller
-if ! $PYTHON_CMD -m PyInstaller --version &> /dev/null; then
+if ! "$PY" -m PyInstaller --version &> /dev/null; then
     echo "ERROR: PyInstaller not found. Please install it:"
-    echo "  $PYTHON_CMD -m pip install pyinstaller"
+    echo "  $PY -m pip install pyinstaller"
     exit 1
 fi
 
-echo "[Build] PyInstaller version: $($PYTHON_CMD -m PyInstaller --version)"
+echo "[Build] PyInstaller version: $("$PY" -m PyInstaller --version)"
 echo ""
 
-# Clean previous builds
+# Clean previous builds (PyInstaller outputs only).
+# NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
 echo "[Build] Cleaning previous builds..."
 rm -rf dist/AceForge.app dist/CDMF build/AceForge
+
+# Safeguard: build/macos must exist for the app icon and code signing
+if [ ! -f "build/macos/AceForge.icns" ]; then
+    echo "ERROR: build/macos/AceForge.icns not found. build/macos/ must never be deleted."
+    echo "  Restore from main: git checkout main -- build/macos/"
+    exit 1
+fi
 
 # Build with PyInstaller
 echo "[Build] Building app bundle with PyInstaller..."
 echo "This may take several minutes..."
-$PYTHON_CMD -m PyInstaller CDMF.spec --clean --noconfirm
+"$PY" -m PyInstaller CDMF.spec --clean --noconfirm
 
 # Check if build succeeded
 BUNDLED_APP="${APP_DIR}/dist/AceForge.app"

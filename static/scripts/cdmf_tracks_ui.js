@@ -829,7 +829,7 @@
       if (data.tracks.length === 0) {
         const opt = document.createElement("option");
         opt.value = "";
-        opt.textContent = "(No .wav files found yet)";
+        opt.textContent = "(No tracks yet)";
         list.appendChild(opt);
         buildTrackPanel(data);
       } else {

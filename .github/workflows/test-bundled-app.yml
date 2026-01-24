@@ -66,6 +66,14 @@ jobs:
     - name: Install PyInstaller
       run: |
         pip install pyinstaller==6.17.0
+
+    # build/macos must never be deleted: AceForge.icns (app icon), codesign.sh, pyinstaller hooks
+    - name: Check build/macos assets (icon, codesign)
+      run: |
+        if [ ! -f "build/macos/AceForge.icns" ]; then
+          echo "::error::build/macos/AceForge.icns not found. build/macos/ must never be deleted."
+          exit 1
+        fi
         
     - name: Build with PyInstaller
       run: |
