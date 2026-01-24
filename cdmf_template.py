@@ -25,9 +25,6 @@ HTML = r"""
             alt="AceForge logo"
           >
         </span>
-        <h1 class="cd-title">
-          AceForge
-        </h1>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span class="cd-alpha">{{ version or 'v0.1' }}</span>

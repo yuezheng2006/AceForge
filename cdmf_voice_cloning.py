@@ -198,9 +198,14 @@ class VoiceCloner:
         Returns:
             Path to generated audio file
         """
+        # Ensure pydub can find ffprobe/ffmpeg (e.g. when running from .app with minimal PATH)
+        from cdmf_ffmpeg import ensure_ffmpeg_in_path
+
+        ensure_ffmpeg_in_path()
+
         # Initialize with device preference (will reuse if same preference)
         self._initialize(device_preference)
-        
+
         # Validate reference audio file exists
         speaker_path = Path(speaker_wav)
         if not speaker_path.exists():
@@ -255,6 +260,10 @@ class VoiceCloner:
             logger.info(f"Voice cloning completed: {output_path}")
             return output_path
         except Exception as e:
+            from cdmf_ffmpeg import FFMPEG_INSTALL_HINT, is_ffmpeg_not_found_error
+
+            if is_ffmpeg_not_found_error(e):
+                raise RuntimeError(FFMPEG_INSTALL_HINT) from e
             logger.error(f"Voice cloning failed: {e}")
             raise
         finally:

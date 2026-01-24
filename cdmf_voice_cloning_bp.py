@@ -129,6 +129,10 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                 # Save track metadata (seconds, generator, voice clone params) for Music Player
                 # and "copy generation settings back to form"
                 try:
+                    from cdmf_ffmpeg import ensure_ffmpeg_in_path
+
+                    ensure_ffmpeg_in_path()
+
                     from pydub import AudioSegment
 
                     final_name = Path(result_path).name
@@ -155,7 +159,12 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                     track_meta[final_name] = entry
                     cdmf_tracks.save_track_meta(track_meta)
                 except Exception as e:
-                    logger.warning("[Voice Cloning] Failed to save track metadata: %s", e)
+                    from cdmf_ffmpeg import FFMPEG_INSTALL_HINT, is_ffmpeg_not_found_error
+
+                    if is_ffmpeg_not_found_error(e):
+                        logger.warning("[Voice Cloning] Failed to save track metadata: %s", FFMPEG_INSTALL_HINT)
+                    else:
+                        logger.warning("[Voice Cloning] Failed to save track metadata: %s", e)
 
                 # Get updated track list
                 tracks = cdmf_tracks.list_music_files()

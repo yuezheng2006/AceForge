@@ -254,6 +254,7 @@ a = Analysis(
         'lzma',  # Required by py3langid for loading pickled models
         '_lzma',  # C extension for lzma (required on some systems)
         # Voice cloning (TTS library - must be installed in build env and in hiddenimports)
+        'cdmf_ffmpeg',  # PATH fix for ffprobe/ffmpeg when .app has minimal PATH
         'cdmf_voice_cloning',
         'cdmf_voice_cloning_bp',
         'TTS',

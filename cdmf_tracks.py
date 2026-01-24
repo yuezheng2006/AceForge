@@ -105,13 +105,20 @@ def save_user_presets(data: Dict[str, Any]) -> None:
 
 
 def get_audio_duration(path: Path) -> float:
-    """Return duration in seconds. Uses pydub for .wav and .mp3. Returns 0.0 on error."""
+    """Return duration in seconds. Uses pydub for .wav and .mp3. Returns 0.0 on error.
+    Re-raises with an install hint if the error is ffprobe/ffmpeg not found."""
     try:
+        from cdmf_ffmpeg import FFMPEG_INSTALL_HINT, ensure_ffmpeg_in_path, is_ffmpeg_not_found_error
+
+        ensure_ffmpeg_in_path()
+
         from pydub import AudioSegment
 
         seg = AudioSegment.from_file(str(path))
         return len(seg) / 1000.0
-    except Exception:
+    except Exception as e:
+        if is_ffmpeg_not_found_error(e):
+            raise RuntimeError(FFMPEG_INSTALL_HINT) from e
         return 0.0
 
 
