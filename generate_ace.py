@@ -466,23 +466,9 @@ def _choose_effective_seed(seed: int) -> int:
 
 
 def _next_available_output_path(out_dir: Path, basename: str, ext: str = ".wav") -> Path:
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    stem = Path(basename).stem
-    if not ext.startswith("."):
-        ext = "." + ext
-
-    candidate = out_dir / f"{stem}{ext}"
-    if not candidate.exists():
-        return candidate
-
-    idx = 2
-    while True:
-        candidate = out_dir / f"{stem}{idx}{ext}"
-        if not candidate.exists():
-            return candidate
-        idx += 1
+    """Use shared helper to avoid overwriting existing files (-1, -2, -3, ...)."""
+    stem = Path(basename).stem if basename else "output"
+    return cdmf_paths.get_next_available_output_path(out_dir, stem, ext)
 
 
 def _apply_vibe_to_tags(prompt: str, seed_vibe: str) -> str:

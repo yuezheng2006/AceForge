@@ -170,6 +170,62 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Helper: Restore file input from path using DataTransfer API
+  // Only restores if file is accessible, otherwise does nothing
+  // ---------------------------------------------------------------------------
+  
+  CDMF.restoreFileInput = function(fileInput, filePath) {
+    if (!fileInput || !filePath || typeof filePath !== "string") {
+      return;
+    }
+    
+    // Extract basename from path (handle both / and \ separators)
+    var basename = filePath.split(/[/\\]/).pop() || filePath;
+    
+    // Try to fetch the file and restore it
+    // For files in output directory, try to serve via /music/<filename>
+    // For other paths, try direct fetch (may fail due to CORS/file:// restrictions)
+    var url = filePath;
+    
+    // If path looks like it's in the output directory, try /music/<filename>
+    // This is a heuristic - we check if the path ends with the basename
+    if (filePath.includes(basename)) {
+      // Try serving via /music endpoint if it's in output directory
+      url = "/music/" + encodeURIComponent(basename);
+    }
+    
+    // Try to fetch and restore the file
+    fetch(url)
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error("File not accessible");
+        }
+        return response.blob();
+      })
+      .then(function(blob) {
+        // Create a File object from the blob
+        var file = new File([blob], basename, {
+          type: blob.type || "application/octet-stream",
+          lastModified: new Date()
+        });
+        
+        // Use DataTransfer to set the file
+        var dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInput.files = dataTransfer.files;
+        
+        // Set data-file attribute for Safari compatibility
+        if (fileInput.webkitEntries && fileInput.webkitEntries.length) {
+          fileInput.setAttribute("data-file", basename);
+        }
+      })
+      .catch(function() {
+        // File doesn't exist or isn't accessible - do nothing
+        // (e.g., deleted temp files from uploads)
+      });
+  };
+
+  // ---------------------------------------------------------------------------
   // Apply settings → form (used by presets + tracks)
   // ---------------------------------------------------------------------------
 
@@ -177,7 +233,7 @@
     if (!settings) return;
 
     // Voice Clone tracks: switch to Voice Clone tab and fill that form
-    if (settings.generator === "voice_clone") {
+    if (settings.generator === "tts" || settings.generator === "voice_clone") {
       if (typeof CDMF.applyVoiceCloneSettingsToForm === "function") {
         CDMF.applyVoiceCloneSettingsToForm(settings);
         return;
@@ -185,9 +241,17 @@
     }
 
     // Stem Split tracks: switch to Stem Splitting tab and fill that form
-    if (settings.generator === "stem_split") {
+    if (settings.generator === "stem" || settings.generator === "stem_split") {
       if (typeof CDMF.applyStemSplitSettingsToForm === "function") {
         CDMF.applyStemSplitSettingsToForm(settings);
+        return;
+      }
+    }
+
+    // MIDI Generation tracks: switch to MIDI Generation tab and fill that form
+    if (settings.generator === "midi" || settings.generator === "midi_generation") {
+      if (typeof CDMF.applyMidiGenSettingsToForm === "function") {
+        CDMF.applyMidiGenSettingsToForm(settings);
         return;
       }
     }
@@ -354,8 +418,18 @@
     if (refAudioStrengthField && settings.ref_audio_strength != null) {
       refAudioStrengthField.value = String(settings.ref_audio_strength);
     }
-    if (srcAudioPathField && typeof settings.src_audio_path === "string") {
-      srcAudioPathField.value = settings.src_audio_path;
+    if (srcAudioPathField) {
+      // Restore from input_file_path if available (new field), otherwise src_audio_path
+      if (settings.input_file_path && typeof settings.input_file_path === "string") {
+        srcAudioPathField.value = settings.input_file_path;
+      } else if (settings.src_audio_path && typeof settings.src_audio_path === "string") {
+        srcAudioPathField.value = settings.src_audio_path;
+      }
+      // Show indicator if input_file exists but file input can't be set
+      if (settings.input_file && typeof settings.input_file === "string" && refAudioFileField) {
+        // Can't set file input directly, but we can show a helper message
+        // The src_audio_path field above should handle the path case
+      }
     }
     if (loraNameField && typeof settings.lora_name_or_path === "string") {
       loraNameField.value = settings.lora_name_or_path;

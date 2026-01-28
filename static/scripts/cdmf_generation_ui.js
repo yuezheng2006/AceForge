@@ -429,6 +429,17 @@
       return false;
     }
 
+    // Base filename is required
+    const basenameEl = document.getElementById("basename");
+    if (basenameEl && !(basenameEl.value || "").trim()) {
+      if (ev && ev.preventDefault) {
+        ev.preventDefault();
+      }
+      alert("Base filename is required. Please enter a name for the generated track.");
+      basenameEl.focus();
+      return false;
+    }
+
     // Sync Audio2Audio flag with the file selector
     try {
       const form = ev && ev.target ? ev.target : document;

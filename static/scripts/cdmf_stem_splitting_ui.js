@@ -383,6 +383,16 @@
     setVal("stem_split_mode", settings.mode || "");
     setVal("stem_split_export_format", settings.export_format);
     setVal("stem_split_out_dir", settings.out_dir);
+    setVal("stem_split_base_filename", settings.base_filename || "");
+    
+    // Restore input file (show basename from full path)
+    var inputFileName = settings.original_file || settings.input_file;
+    if (inputFileName && typeof inputFileName === "string") {
+      var inputFileEl = document.getElementById("stem_split_input_file");
+      if (inputFileEl && typeof CDMF.restoreFileInput === "function") {
+        CDMF.restoreFileInput(inputFileEl, inputFileName);
+      }
+    }
   };
 
   // Update mode-specific UI when stem_count or mode changes
