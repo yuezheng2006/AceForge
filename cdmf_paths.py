@@ -216,19 +216,49 @@ SEED_VIBES = [
 def get_app_version() -> str:
     """
     Read the application version from VERSION file.
-    Falls back to 'v0.1' if file doesn't exist or can't be read.
+    Falls back to 'dev' if file doesn't exist or can't be read.
     The VERSION file is updated by GitHub Actions during release builds.
+    
+    For frozen apps (PyInstaller), checks multiple locations:
+    1. sys._MEIPASS (PyInstaller temp extraction directory) - primary location
+    2. APP_DIR (executable directory) - fallback
+    3. Bundle root (for macOS app bundles) - fallback
     """
-    version_file = APP_DIR / "VERSION"
-    if version_file.exists():
-        try:
-            with version_file.open("r", encoding="utf-8") as f:
-                version = f.read().strip()
-                if version:
-                    return version
-        except Exception as e:
-            print(f"[AceForge] Warning: Failed to read VERSION file: {e}", flush=True)
-    # Default fallback
-    return "v0.1"
+    # Try multiple locations for frozen apps
+    candidates = []
+    
+    if getattr(sys, "frozen", False):
+        # For frozen apps, check sys._MEIPASS first (PyInstaller extraction dir)
+        # This is where PyInstaller extracts bundled files during execution
+        if hasattr(sys, "_MEIPASS"):
+            candidates.append(Path(sys._MEIPASS) / "VERSION")
+        # Also check executable directory (MacOS folder)
+        candidates.append(APP_DIR / "VERSION")
+        # For macOS app bundles, also check bundle root (Contents/)
+        if sys.platform == "darwin":
+            # sys.executable is Contents/MacOS/AceForge_bin
+            # APP_DIR is Contents/MacOS/
+            # Bundle root (Contents/) is APP_DIR.parent
+            bundle_root = APP_DIR.parent
+            candidates.append(bundle_root / "VERSION")
+    else:
+        # For development, just check APP_DIR (project root)
+        candidates.append(APP_DIR / "VERSION")
+    
+    # Try each candidate location
+    for version_file in candidates:
+        if version_file.exists():
+            try:
+                with version_file.open("r", encoding="utf-8") as f:
+                    version = f.read().strip()
+                    if version:
+                        print(f"[AceForge] Loaded version '{version}' from {version_file}", flush=True)
+                        return version
+            except Exception as e:
+                print(f"[AceForge] Warning: Failed to read VERSION file from {version_file}: {e}", flush=True)
+    
+    # Default fallback for development builds
+    print(f"[AceForge] No VERSION file found, using default 'dev'", flush=True)
+    return "dev"
 
 APP_VERSION = get_app_version()

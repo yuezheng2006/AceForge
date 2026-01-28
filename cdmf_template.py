@@ -30,7 +30,7 @@ HTML = r"""
         </span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <span class="cd-alpha">{{ version or 'v0.1' }}</span>
+        <span class="cd-alpha">{{ version or 'dev' }}</span>
         <button type="button" class="btn danger exit" id="btnExitApp" title="Exit AceForge">
           <span class="icon">🚪</span><span class="label">Exit</span>
         </button>
