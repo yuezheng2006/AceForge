@@ -13,7 +13,7 @@ from flask import Blueprint, request, render_template_string, jsonify
 from werkzeug.utils import secure_filename
 
 import cdmf_tracks
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION
+from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION, get_next_available_output_path
 from cdmf_midi_generation import get_midi_generator
 
 logger = logging.getLogger(__name__)
@@ -88,21 +88,28 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
             melodia_trick = request.form.get("melodia_trick", "true").lower() == "true"
             midi_tempo = float(request.form.get("midi_tempo", DEFAULT_MIDI_TEMPO))
             
-            # Get output filename
+            # Get output filename (required)
             output_filename = request.form.get("output_filename", "").strip()
             if not output_filename:
-                # Generate default filename from input
-                input_basename = Path(filename).stem
-                output_filename = f"{input_basename}_midi"
+                return jsonify({
+                    "error": True,
+                    "message": "Output filename is required and cannot be empty."
+                }), 400
             
-            # Ensure .mid extension
-            if not output_filename.lower().endswith('.mid'):
-                output_filename = f"{output_filename}.mid"
+            # Ensure .mid extension for stem
+            if output_filename.lower().endswith('.mid'):
+                stem = Path(output_filename).stem
+            else:
+                stem = output_filename
             
             # Get output directory (same as music generation)
             out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
+            
+            # Resolve path without overwriting existing files (-1, -2, …)
+            output_path = get_next_available_output_path(out_dir_path, stem, ".mid")
+            output_filename = output_path.name
             
             # Save uploaded input file temporarily
             import tempfile
@@ -111,8 +118,7 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
             input_file.save(str(temp_input_path))
             
             try:
-                # Generate output path
-                output_path = out_dir_path / output_filename
+                # output_path already set above (next-available, no overwrite)
                 
                 # Perform MIDI generation
                 logger.info(f"[MIDI Generation] Starting: input={filename}, output={output_path}")
@@ -153,8 +159,9 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
                     if "favorite" not in entry:
                         entry["favorite"] = False
                     entry["created"] = time.time()
-                    entry["generator"] = "midi_generation"
+                    entry["generator"] = "midi"
                     entry["basename"] = Path(midi_filename).stem
+                    # original_file already saved below
                     entry["onset_threshold"] = onset_threshold
                     entry["frame_threshold"] = frame_threshold
                     entry["minimum_note_length_ms"] = minimum_note_length_ms
@@ -164,7 +171,8 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
                     entry["melodia_trick"] = melodia_trick
                     entry["midi_tempo"] = midi_tempo
                     entry["out_dir"] = str(out_dir_path)
-                    entry["original_file"] = filename
+                    entry["original_file"] = str(temp_input_path)
+                    entry["input_file"] = str(temp_input_path)  # Full path for consistency
                     track_meta[midi_filename] = entry
                     
                     cdmf_tracks.save_track_meta(track_meta)

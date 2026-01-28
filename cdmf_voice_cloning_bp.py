@@ -13,7 +13,7 @@ from flask import Blueprint, request, render_template_string, jsonify
 from werkzeug.utils import secure_filename
 
 import cdmf_tracks
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION
+from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION, get_next_available_output_path
 from cdmf_voice_cloning import get_voice_cloner
 
 logger = logging.getLogger(__name__)
@@ -72,10 +72,13 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                     "message": "Invalid file format. Please use MP3, WAV, M4A, or FLAC."
                 }), 400
             
-            # Get output filename (default MP3 256k for cloned voices)
+            # Get output filename (required)
             output_filename = request.form.get("output_filename", "").strip()
             if not output_filename:
-                output_filename = "voice_clone_output"
+                return jsonify({
+                    "error": True,
+                    "message": "Output filename is required and cannot be empty."
+                }), 400
             if not output_filename.lower().endswith((".wav", ".mp3")):
                 output_filename += ".mp3"
             
@@ -83,6 +86,12 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
             out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
+            
+            # Resolve stem and extension for next-available path
+            stem = Path(output_filename).stem
+            ext = Path(output_filename).suffix or ".mp3"
+            output_path = get_next_available_output_path(out_dir_path, stem, ext)
+            output_filename = output_path.name
             
             # Save uploaded reference audio temporarily
             temp_ref_path = out_dir_path / f"_temp_ref_{filename}"
@@ -100,8 +109,7 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                 speed = float(request.form.get("speed", DEFAULT_SPEED))
                 enable_text_splitting = request.form.get("enable_text_splitting", "true").lower() == "true"
                 
-                # Generate output path
-                output_path = out_dir_path / output_filename
+                # output_path already set above (next-available, no overwrite)
                 
                 # Perform voice cloning
                 logger.info(f"[Voice Cloning] Starting: text='{text[:50]}...', language={language}, output={output_path}")
@@ -143,8 +151,9 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                         entry["favorite"] = False
                     entry["seconds"] = dur
                     entry["created"] = time.time()
-                    entry["generator"] = "voice_clone"
+                    entry["generator"] = "tts"
                     entry["basename"] = Path(final_name).stem
+                    entry["input_file"] = str(temp_ref_path)  # Full path to reference audio
                     entry["text"] = text
                     entry["language"] = language
                     entry["temperature"] = temperature

@@ -128,6 +128,33 @@ def _get_default_output_dir() -> Path:
 
 DEFAULT_OUT_DIR = str(_get_default_output_dir())
 
+
+def get_next_available_output_path(out_dir: Path | str, base_stem: str, ext: str = ".wav") -> Path:
+    """
+    Return a path under out_dir for the given base name and extension that does not
+    yet exist. If the exact path exists, appends -1, -2, -3, etc. to avoid overwriting.
+    base_stem should not include the extension (e.g. "My Track" not "My Track.wav").
+    """
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if not ext.startswith("."):
+        ext = "." + ext
+    stem = (base_stem or "").strip()
+    if not stem:
+        stem = "output"
+    # Sanitize: remove path separators
+    stem = stem.replace("/", "_").replace("\\", "_").replace(":", "_")
+    candidate = out_dir / f"{stem}{ext}"
+    if not candidate.exists():
+        return candidate
+    idx = 1
+    while True:
+        candidate = out_dir / f"{stem}-{idx}{ext}"
+        if not candidate.exists():
+            return candidate
+        idx += 1
+
+
 # Presets / tracks metadata / user presets  
 # Keep these in APP_DIR as they're bundled with the application
 # User presets go in user data directory

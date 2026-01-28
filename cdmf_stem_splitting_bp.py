@@ -84,6 +84,11 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
             input_basename = Path(filename).stem
             # Sanitize basename
             input_basename = input_basename.replace("/", "_").replace("\\", "_").replace(":", "_")
+            # Optional base filename prefix from form
+            base_filename = request.form.get("base_filename", "").strip()
+            if base_filename:
+                prefix = base_filename.replace("/", "_").replace("\\", "_").replace(":", "_")
+                input_basename = f"{prefix}_{input_basename}"
             
             # Save uploaded input file temporarily
             # Use a temp directory to avoid cluttering the output directory
@@ -151,15 +156,21 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
                             entry["favorite"] = False
                         entry["seconds"] = dur
                         entry["created"] = time.time()
-                        entry["generator"] = "stem_split"
+                        entry["generator"] = "stem"
                         entry["basename"] = Path(stem_filename).stem
+                        # original_file already saved below
                         entry["stem_name"] = stem_name
                         entry["stem_count"] = stem_count
                         entry["mode"] = mode or ""
                         entry["export_format"] = export_format
                         entry["device_preference"] = device_preference
                         entry["out_dir"] = str(out_dir_path)
-                        entry["original_file"] = filename
+                        entry["original_file"] = str(temp_input_path)
+                        entry["input_file"] = str(temp_input_path)  # Full path for consistency
+                        # Save base_filename if provided
+                        base_filename = request.form.get("base_filename", "").strip()
+                        if base_filename:
+                            entry["base_filename"] = base_filename
                         track_meta[stem_filename] = entry
                     
                     cdmf_tracks.save_track_meta(track_meta)

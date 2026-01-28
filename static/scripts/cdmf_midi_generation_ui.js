@@ -23,6 +23,13 @@
   CDMF.onSubmitMidiGen = function (event) {
     event.preventDefault();
 
+    var outputFilenameEl = document.getElementById("midi_gen_output_filename");
+    if (outputFilenameEl && !(outputFilenameEl.value || "").trim()) {
+      alert("Output filename is required. Please enter a name for the MIDI file.");
+      outputFilenameEl.focus();
+      return false;
+    }
+
     // If basic-pitch model is not ready, trigger download (like ACE-Step "Download Models")
     var statusEl = document.getElementById("midiGenModelStatusNotice");
     var downloadBtn = document.getElementById("midiGenDownloadModelsBtn");
@@ -174,6 +181,16 @@
     }
 
     setVal("midi_gen_output_filename", settings.basename);
+    
+    // Restore input file (show basename from full path)
+    var inputFileName = settings.original_file || settings.input_file;
+    if (inputFileName && typeof inputFileName === "string") {
+      var inputFileEl = document.getElementById("midi_gen_input_file");
+      if (inputFileEl && typeof CDMF.restoreFileInput === "function") {
+        CDMF.restoreFileInput(inputFileEl, inputFileName);
+      }
+    }
+    
     setNumPair("midi_gen_onset_threshold", "midi_gen_onset_threshold_range", settings.onset_threshold);
     setNumPair("midi_gen_frame_threshold", "midi_gen_frame_threshold_range", settings.frame_threshold);
     setNumPair("midi_gen_minimum_note_length_ms", "midi_gen_minimum_note_length_ms_range", settings.minimum_note_length_ms);

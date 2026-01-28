@@ -142,7 +142,8 @@ HTML = r"""
       <div id="coreKnobs">
         <div class="row">
           <label for="basename">Base filename</label>
-          <input id="basename" name="basename" type="text" value="{{ basename or 'Candy Dreams' }}">
+          <input id="basename" name="basename" type="text" value="{{ basename or 'Candy Dreams' }}" required>
+          <div class="small">Required. Used as the base name for the generated track file (e.g. My Track.wav).</div>
         </div>
 
         <div class="row" id="autoPromptLyricsRow">
@@ -793,15 +794,16 @@ HTML = r"""
           </div>
 
           <div class="row">
-            <label for="voice_clone_output_filename">Output Filename</label>
+            <label for="voice_clone_output_filename">Output filename</label>
             <input
               id="voice_clone_output_filename"
               name="output_filename"
               type="text"
               placeholder="voice_clone_output"
-              value="voice_clone_output">
+              value="voice_clone_output"
+              required>
             <div class="small">
-              Output filename (without extension). Will be saved as .wav in the output directory.
+              Required. Output filename (without extension). Saved as MP3 in the output directory. If the file already exists, a number is appended (-1, -2, …).
             </div>
           </div>
 
@@ -964,6 +966,19 @@ HTML = r"""
           </div>
 
           <div class="row">
+            <label for="stem_split_base_filename">Base filename (optional)</label>
+            <input
+              id="stem_split_base_filename"
+              name="base_filename"
+              type="text"
+              placeholder=""
+              value="">
+            <div class="small">
+              Optional. If set, this prefix is added to generated stem filenames (e.g. <em>myprefix</em>_song_stems_vocals.wav).
+            </div>
+          </div>
+
+          <div class="row">
             <label for="stem_split_stem_count">Number of Stems</label>
             <select id="stem_split_stem_count" name="stem_count">
               <option value="2">2-Stem (Vocals / Instrumental)</option>
@@ -1064,15 +1079,16 @@ HTML = r"""
           </div>
 
           <div class="row">
-            <label for="midi_gen_output_filename">Output Filename</label>
+            <label for="midi_gen_output_filename">Output filename</label>
             <input
               id="midi_gen_output_filename"
               name="output_filename"
               type="text"
               placeholder="output_midi"
-              value="">
+              value=""
+              required>
             <div class="small">
-              Output filename (without extension). Will be saved as .mid in the output directory. If left empty, uses input filename + "_midi".
+              Required. Output filename (without extension). Saved as .mid in the output directory. If the file already exists, a number is appended (-1, -2, …).
             </div>
           </div>
 

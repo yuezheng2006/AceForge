@@ -9,7 +9,14 @@
 
   CDMF.onSubmitVoiceClone = function (event) {
     event.preventDefault();
-    
+
+    var outputFilenameEl = document.getElementById("voice_clone_output_filename");
+    if (outputFilenameEl && !(outputFilenameEl.value || "").trim()) {
+      alert("Output filename is required. Please enter a name for the output file.");
+      outputFilenameEl.focus();
+      return;
+    }
+
     var form = event.target;
     var formData = new FormData(form);
     
@@ -148,6 +155,14 @@
     setVal("voice_clone_output_filename", settings.basename);
     setVal("voice_clone_language", settings.language);
     setVal("voice_clone_device", settings.device_preference);
+    
+    // Restore input file (show basename from full path)
+    if (settings.input_file && typeof settings.input_file === "string") {
+      var inputFileEl = document.getElementById("speaker_wav");
+      if (inputFileEl && typeof CDMF.restoreFileInput === "function") {
+        CDMF.restoreFileInput(inputFileEl, settings.input_file);
+      }
+    }
     setNumPair("voice_clone_temperature", "voice_clone_temperature_range", settings.temperature);
     setNumPair("voice_clone_length_penalty", "voice_clone_length_penalty_range", settings.length_penalty);
     setNumPair("voice_clone_repetition_penalty", "voice_clone_repetition_penalty_range", settings.repetition_penalty);

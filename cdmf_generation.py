@@ -400,7 +400,9 @@ def create_generation_blueprint(
             out_dir = (
                 request.form.get("out_dir", DEFAULT_OUT_DIR).strip() or DEFAULT_OUT_DIR
             )
-            basename = request.form.get("basename", "Candy Dreams").strip() or "Candy Dreams"
+            basename = request.form.get("basename", "").strip()
+            if not basename:
+                raise ValueError("Base filename is required and cannot be empty.")
             seed_vibe = request.form.get("seed_vibe", "any").strip() or "any"
 
             preset_id = request.form.get("preset_id", "").strip()
@@ -417,6 +419,7 @@ def create_generation_blueprint(
             # Determine reference-audio path
             uploaded_ref = request.files.get("ref_audio_file")
             src_audio_path: Optional[str] = None
+            ref_audio_filename: Optional[str] = None
             if uploaded_ref and uploaded_ref.filename:
                 try:
                     filename = secure_filename(uploaded_ref.filename)
@@ -424,6 +427,7 @@ def create_generation_blueprint(
                     filename = uploaded_ref.filename or ""
                 if not filename:
                     filename = f"ref_{int(time.time() * 1000)}.wav"
+                ref_audio_filename = filename  # Save original filename
 
                 name_root, ext = os.path.splitext(filename)
                 ext = (ext or "").lower()
@@ -580,7 +584,14 @@ def create_generation_blueprint(
                     "lora_name_or_path", lora_name_or_path
                 )
                 entry["lora_weight"] = summary.get("lora_weight", lora_weight)
-                entry["generator"] = "ace_step"
+                entry["generator"] = "gen"
+                # Save input file as full path when available
+                if src_audio_path:
+                    entry["input_file"] = src_audio_path
+                    entry["input_file_path"] = src_audio_path
+                    entry["src_audio_path"] = src_audio_path  # Keep for backward compatibility
+                elif ref_audio_filename:
+                    entry["input_file"] = ref_audio_filename  # Fallback: filename only (legacy)
 
                 meta[wav_path.name] = entry
                 cdmf_tracks.save_track_meta(meta)
