@@ -19,7 +19,8 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
     - Mass-create `_prompt.txt` / `_lyrics.txt` files
     - Auto-tag datasets using **MuFun-ACEStep** _(experimental)_
 - Stem Splitting using **Demucs** for high-quality audio separation
-- Voice Cloning TTS using **XTTS v2**
+- **Voice Cloning** TTS using **XTTS v2**
+- **MIDI Generation** using **basic-pitch** for audio-to-MIDI transcription
 - Embedded **Music Player** to explore generation catalog
 - Manage and reuse **prompt presets**
 
@@ -116,6 +117,22 @@ The **Voice Clone** uses `XTTS v2` to synthesize speech in a cloned voice
 **ffmpeg** must be installed (e.g. `brew install ffmpeg`) for non-WAV references.
 
 > First use requires downloading a **large** XTTS model (~1.9 GB) please be patient
+
+## MIDI Generation (basic-pitch)
+
+The **MIDI Generation** tab uses **basic-pitch** (by Spotify) to convert audio files to MIDI format through automatic music transcription.
+
+**Features:**
+- Convert any audio file (MP3, WAV, etc.) to MIDI format
+- Adjustable transcription parameters:
+  - Onset threshold and frame threshold for note detection
+  - Minimum note length and minimum frequency
+  - Tempo estimation
+  - Pitch bend detection
+  - Melodia trick (improved pitch tracking)
+
+> The basic-pitch models are bundled with the app, so no download is required. Processing time varies based on file length and your device.
+
 
 ## LoRA training
 
