@@ -13,11 +13,12 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 - 100% Local _(only needs to download models once)_
 - Music Generation with **ACE-Step** prompts
-  - Use **Stem separation** to rebalance vocals vs instrumentals
+  - Use **Stem splitting** with Demucs to separate vocals, drums, bass, and other instruments
   - Use existing **Audio** as reference _(optional)_ 
   - Train **ACE-Step LoRAs** from your own datasets
     - Mass-create `_prompt.txt` / `_lyrics.txt` files
     - Auto-tag datasets using **MuFun-ACEStep** _(experimental)_
+- **Stem Splitting** using **Demucs** for high-quality audio separation (2-stem, 4-stem, 6-stem modes)
 - Voice Cloning TTS using **XTTS v2**
 - Embedded **Music Player** to explore generation catalog
 - Manage and reuse **prompt presets**
@@ -66,7 +67,7 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 1. Launch AceForge and wait for the UI
 2. Go to **Generate** → create tracks from prompt (and lyrics if desired)
 3. Browse/manage tracks in **Music Player**
-4. (Optional) Use stem controls to adjust vocal/instrumental balance
+4. (Optional) **Stem Splitting**: Separate audio into individual stems (vocals, drums, bass, other)
 5. (Optional) **Voice Clone**: TTS voice cloning using reference clips
 6. (Optional) Build a dataset and train a LoRA in **Training**
 
@@ -82,15 +83,17 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
   - Provide lyrics using markers like `[verse]`, `[chorus]`, `[solo]`, etc.
 - **Presets** let you save/load a whole “knob bundle” (text + sliders)
 
-## Stem separation (vocals vs instrumentals)
+## Stem Splitting with Demucs
 
-AceForge can run `audio-separator` as a post-process step so you can rebalance:
-- Vocals level (dB)
-- Instrumental level (dB)
+AceForge includes a dedicated **Stem Splitting** tab powered by **Demucs** for high-quality audio separation:
 
-For fast iteration: generate with both gains at `0 dB`, then only use stems once you like a track.
+- **2-stem mode**: Separate vocals and instrumentals
+- **4-stem mode**: Separate vocals, drums, bass, and other instruments  
+- **6-stem mode**: Even finer separation including piano and guitar
 
-> First use requires downloading a **large** stem model and adds a heavy processing step 
+Upload any audio file (MP3, WAV, etc.) and AceForge will split it into individual stem tracks that appear in the Music Player.
+
+> First use requires downloading the Demucs model (~80MB). Processing time varies based on file length and your device (Apple Silicon MPS is faster than CPU) 
 
 ## Voice cloning (XTTS v2)
 
