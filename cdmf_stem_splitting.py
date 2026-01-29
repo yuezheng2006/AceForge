@@ -18,6 +18,7 @@ import platform
 import tempfile
 import logging
 import traceback
+import ssl
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple, Callable
 
@@ -32,6 +33,39 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
 # Progress callback for stem splitting
 _stem_split_progress_callback: Optional[Callable[[float, str], None]] = None
+
+
+class _SSLContextManager:
+    """Context manager to temporarily disable SSL certificate verification for model downloads."""
+    
+    def __init__(self):
+        self._original_context = None
+        self._unverified_context = None
+        
+    def __enter__(self):
+        """Disable SSL certificate verification."""
+        try:
+            import urllib.request
+            # Save the original SSL context
+            self._original_context = ssl._create_default_https_context
+            # Create an unverified SSL context
+            self._unverified_context = ssl._create_unverified_context
+            # Temporarily disable SSL verification
+            ssl._create_default_https_context = self._unverified_context
+            logger.debug("SSL certificate verification disabled for model download")
+        except Exception as e:
+            logger.warning(f"Could not disable SSL verification: {e}")
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Restore SSL certificate verification."""
+        try:
+            if self._original_context is not None:
+                ssl._create_default_https_context = self._original_context
+                logger.debug("SSL certificate verification restored")
+        except Exception as e:
+            logger.warning(f"Could not restore SSL verification: {e}")
+        return False
 
 
 def register_stem_split_progress_callback(cb: Optional[Callable[[float, str], None]]) -> None:
@@ -552,9 +586,14 @@ def ensure_stem_split_models(progress_cb: Optional[Callable[[float], None]] = No
             # This avoids argparse issues while still downloading the model
             try:
                 logger.info("Loading Demucs model (this will download if not present)...")
-                model = get_model("htdemucs", repo=None)
-                model.cpu()
-                model.eval()
+                
+                # Use SSL context manager to disable certificate verification during download
+                # This resolves URLError issues on systems with certificate problems
+                with _SSLContextManager():
+                    model = get_model("htdemucs", repo=None)
+                    model.cpu()
+                    model.eval()
+                
                 logger.info("Demucs model loaded successfully (download completed if needed)")
                 
                 # Verify model was downloaded by checking torch.hub cache
