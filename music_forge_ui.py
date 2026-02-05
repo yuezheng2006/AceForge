@@ -860,8 +860,14 @@ def main() -> None:
                 on_closed=on_closed,
             )
             
-            # Apply 80% zoom once the page has had time to load (run in start callback thread)
-            _webview_zoom = "80%"
+            # Apply zoom from preferences (default 80%); takes effect on next launch if changed in Settings
+            try:
+                _cfg = cdmf_paths.load_config()
+                _z = int(_cfg.get("ui_zoom") or 80)
+                _z = max(50, min(150, _z))
+            except Exception:
+                _z = 80
+            _webview_zoom = f"{_z}%"
             _webview_zoom_js = f'document.documentElement.style.zoom = "{_webview_zoom}";'
             def _apply_webview_zoom(win):
                 time.sleep(1.8)

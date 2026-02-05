@@ -458,8 +458,15 @@ def main():
     import atexit
     atexit.register(cleanup_resources)
     
-    # Apply 80% zoom once the page has had time to load (run in start callback thread)
-    _WEBVIEW_ZOOM = "80%"
+    # Apply zoom from preferences (default 80%); takes effect on next launch if changed in Settings
+    try:
+        from cdmf_paths import load_config
+        _cfg = load_config()
+        _z = int(_cfg.get("ui_zoom") or 80)
+        _z = max(50, min(150, _z))
+    except Exception:
+        _z = 80
+    _WEBVIEW_ZOOM = f"{_z}%"
     _WEBVIEW_ZOOM_JS = f'document.documentElement.style.zoom = "{_WEBVIEW_ZOOM}";'
     
     def _apply_webview_zoom(win):

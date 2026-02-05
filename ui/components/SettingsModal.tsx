@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen } from 'lucide-react';
+import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EditProfileModal } from './EditProfileModal';
 import { preferencesApi } from '../services/api';
@@ -12,16 +12,27 @@ interface SettingsModalProps {
     onNavigateToProfile?: (username: string) => void;
 }
 
+const ZOOM_OPTIONS = [80, 90, 100, 110, 125] as const;
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
     const { user } = useAuth();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [modelsFolder, setModelsFolder] = useState('');
+    const [modelsFolderSaved, setModelsFolderSaved] = useState(false);
     const [outputDir, setOutputDir] = useState('');
     const [outputDirSaved, setOutputDirSaved] = useState(false);
+    const [uiZoom, setUiZoom] = useState(80);
+    const [uiZoomSaved, setUiZoomSaved] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             preferencesApi.get()
-                .then((prefs) => setOutputDir(prefs.output_dir ?? ''))
+                .then((prefs) => {
+                    setOutputDir(prefs.output_dir ?? '');
+                    setModelsFolder(prefs.models_folder ?? '');
+                    const z = prefs.ui_zoom ?? 80;
+                    setUiZoom(ZOOM_OPTIONS.includes(z as typeof ZOOM_OPTIONS[number]) ? (z as number) : 80);
+                })
                 .catch(() => {});
         }
     }, [isOpen]);
@@ -29,6 +40,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
     const saveOutputDir = () => {
         preferencesApi.update({ output_dir: outputDir.trim() || undefined })
             .then(() => { setOutputDirSaved(true); setTimeout(() => setOutputDirSaved(false), 2000); })
+            .catch(() => {});
+    };
+
+    const saveModelsFolder = () => {
+        preferencesApi.update({ models_folder: modelsFolder.trim() || undefined })
+            .then(() => { setModelsFolderSaved(true); setTimeout(() => setModelsFolderSaved(false), 2000); })
             .catch(() => {});
     };
 
@@ -63,6 +80,93 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                 </div>
 
                 <div className="p-6 space-y-8">
+                    {/* AceForge paths (models, output) */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <HardDrive size={20} />
+                            <h3 className="font-semibold">Paths</h3>
+                        </div>
+                        <div className="pl-7 space-y-4">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Models folder</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where ACE-Step and other models are stored. Leave blank for app default. Change takes effect immediately.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={modelsFolder}
+                                        onChange={(e) => setModelsFolder(e.target.value)}
+                                        onBlur={saveModelsFolder}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveModelsFolder}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {modelsFolderSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={outputDir}
+                                        onChange={(e) => setOutputDir(e.target.value)}
+                                        onBlur={saveOutputDir}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveOutputDir}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {outputDirSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Display / Zoom */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <ZoomIn size={20} />
+                            <h3 className="font-semibold">Display</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">UI zoom</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Window zoom level. Takes effect on next app launch.</p>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    {ZOOM_OPTIONS.map((pct) => (
+                                        <button
+                                            key={pct}
+                                            type="button"
+                                            onClick={() => {
+                                                setUiZoom(pct);
+                                                preferencesApi.update({ ui_zoom: pct })
+                                                    .then(() => { setUiZoomSaved(true); setTimeout(() => setUiZoomSaved(false), 2000); })
+                                                    .catch(() => {});
+                                            }}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${uiZoom === pct
+                                                ? 'bg-pink-500 text-white'
+                                                : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                                            }`}
+                                        >
+                                            {pct}%
+                                        </button>
+                                    ))}
+                                    {uiZoomSaved && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* User Profile Section */}
                     <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-6">
                         <div className="flex items-center gap-4">

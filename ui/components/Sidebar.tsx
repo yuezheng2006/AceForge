@@ -1,5 +1,5 @@
 import React from 'react';
-import { Library, Disc, Search, Terminal, Sun, Moon, GraduationCap, Layers, Mic, Music2 } from 'lucide-react';
+import { Library, Disc, Search, Terminal, Sun, Moon, GraduationCap, Layers, Mic, Music2, Settings } from 'lucide-react';
 import { View } from '../types';
 
 interface SidebarProps {
@@ -83,6 +83,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           >
             {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
+          <button
+            onClick={onOpenSettings}
+            className="w-10 h-10 rounded-full hover:bg-zinc-100 dark:hover:bg-white/10 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-pink-500 transition-colors mx-auto"
+            title="Settings (paths, zoom, account)"
+          >
+            <Settings size={20} />
           </button>
 
           <div className="flex flex-col items-center gap-2">

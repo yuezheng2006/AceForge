@@ -1,9 +1,12 @@
 """
 Preferences API for new UI. Load/save app-wide settings from aceforge_config.json.
-GET /api/preferences — return full config (output_dir, models_folder, module settings).
+GET /api/preferences — return full config (output_dir, models_folder, ui_zoom, module settings).
 PATCH /api/preferences — merge partial config and save.
 No auth (local-only).
 """
+
+import os
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
@@ -40,4 +43,10 @@ def update_preferences():
     config = load_config()
     _deep_merge(config, data)
     save_config(config)
+    # So ACE-Step and HuggingFace use the new models folder immediately
+    if "models_folder" in data and data["models_folder"]:
+        try:
+            os.environ["HF_HOME"] = str(Path(data["models_folder"]).resolve())
+        except Exception:
+            pass
     return jsonify(config)

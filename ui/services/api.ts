@@ -479,6 +479,8 @@ export const contactApi = {
 export interface AppPreferences {
   output_dir?: string;
   models_folder?: string;
+  /** UI zoom percent (50–150). Takes effect on next app launch. */
+  ui_zoom?: number;
   stem_split?: { out_dir?: string; stem_count?: string; mode?: string; device_preference?: string; export_format?: string };
   voice_clone?: Record<string, unknown>;
   midi_gen?: Record<string, unknown>;
