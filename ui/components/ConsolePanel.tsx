@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Copy } from 'lucide-react';
 
 interface ConsolePanelProps {
   isOpen: boolean;
@@ -62,6 +62,15 @@ export const ConsolePanel: React.FC<ConsolePanelProps> = ({ isOpen, onClose }) =
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [lines]);
 
+  const copyToClipboard = () => {
+    const text = lines.join('\n');
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(
+      () => setErrorMessage(null),
+      () => setErrorMessage('Copy failed')
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -87,17 +96,29 @@ export const ConsolePanel: React.FC<ConsolePanelProps> = ({ isOpen, onClose }) =
               <span className="text-xs text-amber-400">{errorMessage}</span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
-            title="Close"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={copyToClipboard}
+              className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+              title="Copy all to clipboard"
+            >
+              <Copy size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
-        <div className="flex-1 overflow-auto p-3 font-mono text-xs text-zinc-300 whitespace-pre-wrap break-words">
+        <div
+          className="flex-1 overflow-auto p-3 font-mono text-xs text-zinc-300 whitespace-pre-wrap break-words select-text cursor-text"
+          style={{ userSelect: 'text', WebkitUserSelect: 'text' }}
+        >
           {lines.map((line, i) => (
-            <div key={i} className="leading-relaxed">
+            <div key={i} className="leading-relaxed select-text">
               {line}
             </div>
           ))}

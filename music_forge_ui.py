@@ -150,7 +150,7 @@ except Exception as _e:
 # Demucs stem splitting uses torch.hub for model download; cache must be writable.
 # ---------------------------------------------------------------------------
 import cdmf_paths
-from cdmf_paths import APP_VERSION, DEFAULT_OUT_DIR, get_user_data_dir
+from cdmf_paths import APP_VERSION, get_output_dir, get_user_data_dir
 os.environ.setdefault("TORCH_HOME", str(cdmf_paths.get_models_folder()))
 
 # ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ def handle_500(error):
 
 @app.route("/audio/<path:filename>")
 def serve_audio(filename: str):
-    """Serve generated tracks and reference audio. /audio/<name> -> DEFAULT_OUT_DIR; /audio/refs/<name> -> references dir."""
+    """Serve generated tracks and reference audio. /audio/<name> -> configured output dir; /audio/refs/<name> -> references dir."""
     if ".." in filename or filename.startswith("/"):
         return Response("Invalid path", status=400, mimetype="text/plain")
     if filename.startswith("refs/"):
@@ -437,7 +437,7 @@ def serve_audio(filename: str):
         if not path.is_file():
             return Response("Not found", status=404, mimetype="text/plain")
         return send_from_directory(directory, ref_name)
-    directory = Path(DEFAULT_OUT_DIR)
+    directory = Path(get_output_dir())
     path = directory / filename
     if not path.is_file():
         return Response("Not found", status=404, mimetype="text/plain")
@@ -845,7 +845,7 @@ def main() -> None:
                 return
             
             # Create window with native macOS styling
-            webview.create_window(
+            window = webview.create_window(
                 title="AceForge - AI Music Generation",
                 url=window_url,
                 width=1400,
@@ -860,9 +860,23 @@ def main() -> None:
                 on_closed=on_closed,
             )
             
+            # Apply 80% zoom once the page has had time to load (run in start callback thread)
+            _webview_zoom = "80%"
+            _webview_zoom_js = f'document.documentElement.style.zoom = "{_webview_zoom}";'
+            def _apply_webview_zoom(win):
+                time.sleep(1.8)
+                try:
+                    if hasattr(win, 'run_js'):
+                        win.run_js(_webview_zoom_js)
+                    else:
+                        win.evaluate_js(_webview_zoom_js)
+                    print(f"[AceForge] Webview zoom set to {_webview_zoom}", flush=True)
+                except Exception as e:
+                    print(f"[AceForge] Could not set webview zoom: {e}", flush=True)
+            
             # Start the GUI event loop (this blocks until window is closed)
-            # When window closes, on_closed() will be called automatically
-            webview.start(debug=False)
+            # Pass _apply_webview_zoom so it runs in a separate thread after window is ready
+            webview.start(_apply_webview_zoom, window, debug=False)
             
             # This should not be reached (on_closed exits), but just in case
             shutdown_server()

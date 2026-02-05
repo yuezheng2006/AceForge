@@ -458,9 +458,24 @@ def main():
     import atexit
     atexit.register(cleanup_resources)
     
+    # Apply 80% zoom once the page has had time to load (run in start callback thread)
+    _WEBVIEW_ZOOM = "80%"
+    _WEBVIEW_ZOOM_JS = f'document.documentElement.style.zoom = "{_WEBVIEW_ZOOM}";'
+    
+    def _apply_webview_zoom(win):
+        time.sleep(1.8)  # allow initial page load
+        try:
+            if hasattr(win, 'run_js'):
+                win.run_js(_WEBVIEW_ZOOM_JS)
+            else:
+                win.evaluate_js(_WEBVIEW_ZOOM_JS)
+            print(f"[AceForge] Webview zoom set to {_WEBVIEW_ZOOM}", flush=True)
+        except Exception as e:
+            print(f"[AceForge] Could not set webview zoom: {e}", flush=True)
+    
     # Start the GUI event loop (only once - this is a blocking call)
-    # The singleton wrapper ensures this can only be called once globally
-    webview.start(debug=False)
+    # Pass _apply_webview_zoom so it runs in a separate thread after window is ready
+    webview.start(_apply_webview_zoom, window, debug=False)
     
     # This should not be reached (on_window_closed exits), but just in case
     cleanup_resources()

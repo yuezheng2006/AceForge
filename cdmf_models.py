@@ -229,6 +229,87 @@ def create_models_blueprint() -> Blueprint:
     except ImportError:
         pass
 
+    # Voice cloning (TTS/XTTS) model status and ensure - only if voice cloning is available
+    try:
+        from cdmf_voice_cloning import voice_clone_models_present, ensure_voice_clone_models
+
+        def _download_voice_clone_models_worker() -> None:
+            """Background worker to pre-download and load TTS/XTTS model."""
+            cdmf_state.reset_progress()
+            with cdmf_state.PROGRESS_LOCK:
+                cdmf_state.GENERATION_PROGRESS["stage"] = "voice_clone_model_download"
+                cdmf_state.GENERATION_PROGRESS["done"] = False
+                cdmf_state.GENERATION_PROGRESS["error"] = False
+                cdmf_state.GENERATION_PROGRESS["current"] = 0.0
+                cdmf_state.GENERATION_PROGRESS["total"] = 1.0
+            try:
+                def _progress(f: float) -> None:
+                    with cdmf_state.PROGRESS_LOCK:
+                        cdmf_state.GENERATION_PROGRESS["current"] = max(0.0, min(1.0, f))
+                ensure_voice_clone_models(device_preference="auto", progress_cb=_progress)
+                with cdmf_state.VOICE_CLONE_LOCK:
+                    cdmf_state.VOICE_CLONE_STATUS["state"] = "ready"
+                    cdmf_state.VOICE_CLONE_STATUS["message"] = "XTTS voice cloning model is ready."
+                with cdmf_state.PROGRESS_LOCK:
+                    cdmf_state.GENERATION_PROGRESS["current"] = 1.0
+                    cdmf_state.GENERATION_PROGRESS["stage"] = "done"
+                    cdmf_state.GENERATION_PROGRESS["done"] = True
+                    cdmf_state.GENERATION_PROGRESS["error"] = False
+            except Exception as exc:
+                with cdmf_state.VOICE_CLONE_LOCK:
+                    cdmf_state.VOICE_CLONE_STATUS["state"] = "error"
+                    cdmf_state.VOICE_CLONE_STATUS["message"] = f"Failed to load voice cloning model: {exc}"
+                with cdmf_state.PROGRESS_LOCK:
+                    cdmf_state.GENERATION_PROGRESS["stage"] = "error"
+                    cdmf_state.GENERATION_PROGRESS["done"] = True
+                    cdmf_state.GENERATION_PROGRESS["error"] = True
+
+        @bp.route("/models/voice_clone/status", methods=["GET"])
+        def models_voice_clone_status():
+            """Report whether the TTS/XTTS (voice cloning) model is loaded."""
+            with cdmf_state.VOICE_CLONE_LOCK:
+                state = cdmf_state.VOICE_CLONE_STATUS["state"]
+            if state not in ("downloading", "ready"):
+                if voice_clone_models_present():
+                    with cdmf_state.VOICE_CLONE_LOCK:
+                        cdmf_state.VOICE_CLONE_STATUS["state"] = "ready"
+                        cdmf_state.VOICE_CLONE_STATUS["message"] = "XTTS voice cloning model is ready."
+                else:
+                    with cdmf_state.VOICE_CLONE_LOCK:
+                        if cdmf_state.VOICE_CLONE_STATUS["state"] == "unknown":
+                            cdmf_state.VOICE_CLONE_STATUS["state"] = "absent"
+                            cdmf_state.VOICE_CLONE_STATUS["message"] = (
+                                "Voice cloning model has not been downloaded yet."
+                            )
+            with cdmf_state.VOICE_CLONE_LOCK:
+                state = cdmf_state.VOICE_CLONE_STATUS["state"]
+                message = cdmf_state.VOICE_CLONE_STATUS["message"]
+            return jsonify({"ok": True, "ready": state == "ready", "state": state, "message": message})
+
+        @bp.route("/models/voice_clone/ensure", methods=["POST"])
+        def models_voice_clone_ensure():
+            """Trigger a background download/load of the TTS/XTTS model if not present."""
+            with cdmf_state.VOICE_CLONE_LOCK:
+                state = cdmf_state.VOICE_CLONE_STATUS["state"]
+            if state == "ready":
+                return jsonify({"ok": True, "already_ready": True})
+            if state == "downloading":
+                return jsonify({"ok": True, "already_downloading": True})
+            if voice_clone_models_present():
+                with cdmf_state.VOICE_CLONE_LOCK:
+                    cdmf_state.VOICE_CLONE_STATUS["state"] = "ready"
+                    cdmf_state.VOICE_CLONE_STATUS["message"] = "XTTS voice cloning model is ready."
+                return jsonify({"ok": True, "already_ready": True})
+            with cdmf_state.VOICE_CLONE_LOCK:
+                cdmf_state.VOICE_CLONE_STATUS["state"] = "downloading"
+                cdmf_state.VOICE_CLONE_STATUS["message"] = (
+                    "Downloading XTTS voice cloning model. This may take several minutes (first use only)."
+                )
+            threading.Thread(target=_download_voice_clone_models_worker, daemon=True).start()
+            return jsonify({"ok": True, "started": True})
+    except ImportError:
+        pass
+
     # MIDI generation (basic-pitch) model status and ensure - only if MIDI generation is available
     try:
         from midi_model_setup import basic_pitch_models_present, ensure_basic_pitch_models

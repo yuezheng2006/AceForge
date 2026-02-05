@@ -579,6 +579,12 @@ export const toolsApi = {
   midiModelEnsure: (): Promise<{ ok: boolean; started?: boolean; already_ready?: boolean; already_downloading?: boolean }> =>
     fetchJson('/models/midi_gen/ensure', { method: 'POST' }),
 
+  voiceCloneModelStatus: (): Promise<{ ok: boolean; ready: boolean; state: string; message?: string }> =>
+    fetchJson('/models/voice_clone/status'),
+
+  voiceCloneModelEnsure: (): Promise<{ ok: boolean; started?: boolean; already_ready?: boolean; already_downloading?: boolean }> =>
+    fetchJson('/models/voice_clone/ensure', { method: 'POST' }),
+
   // ACE-Step model (for Training and Generate) — same as legacy /models/status and /models/ensure
   aceModelStatus: (): Promise<{ ok: boolean; ready: boolean; state: string; message?: string }> =>
     fetchJson('/models/status'),

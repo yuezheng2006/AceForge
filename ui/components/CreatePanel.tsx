@@ -140,7 +140,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   // Advanced Settings
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [duration, setDuration] = useState(-1);
-  const [batchSize, setBatchSize] = useState(2);
+  const [batchSize, setBatchSize] = useState(1);
   const [bulkCount, setBulkCount] = useState(1); // Number of independent generation jobs to queue
   const [guidanceScale, setGuidanceScale] = useState(7.0);
   const [randomSeed, setRandomSeed] = useState(true);
@@ -165,7 +165,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [audioCodes, setAudioCodes] = useState('');
   const [repaintingStart, setRepaintingStart] = useState(0);
   const [repaintingEnd, setRepaintingEnd] = useState(-1);
-  const [instruction, setInstruction] = useState('Fill the audio semantic mask based on the given conditions:');
   const [audioCoverStrength, setAudioCoverStrength] = useState(1.0);
   const [taskType, setTaskType] = useState('text2music');
   const [useAdg, setUseAdg] = useState(false);
@@ -595,7 +594,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       onGenerate({
         customMode,
         songDescription: customMode ? undefined : songDescription,
-        prompt: lyrics,
+        prompt: style,
         lyrics,
         style,
         title: bulkCount > 1 ? `${title} (${i + 1})` : title,
@@ -624,7 +623,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         audioCodes: audioCodes.trim() || undefined,
         repaintingStart,
         repaintingEnd,
-        instruction,
         audioCoverStrength,
         taskType,
         useAdg,
@@ -849,7 +847,134 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         {/* CUSTOM MODE */}
         {customMode && (
           <div className="space-y-5">
-            {/* Audio Section */}
+            {/* Title */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                Title
+              </div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Name your song"
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
+              />
+            </div>
+
+            {/* Style of Music */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20">
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
+                <div>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Style of Music</span>
+                    <InfoTooltip text={(taskType === 'cover' || taskType === 'audio2audio') ? 'Target style for the cover (genre, mood, instruments). Lower Cover Strength gives this more influence over the source.' : 'Genre, mood, instruments, vibe'} />
+                  </span>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Genre, mood, instruments, vibe</p>
+                </div>
+                <button
+                  className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
+                  title="AI Format - Enhance style & auto-fill parameters"
+                  onClick={handleFormat}
+                  disabled={isFormatting || !style.trim()}
+                >
+                  <Sparkles size={14} />
+                </button>
+              </div>
+              <textarea
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                placeholder="e.g. upbeat pop rock, emotional ballad, 90s hip hop"
+                className="w-full h-20 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
+              />
+              <div className="px-3 pb-3 flex flex-wrap gap-2">
+                {['Pop', 'Rock', 'Electronic', 'Hip Hop', 'Jazz', 'Classical'].map(tag => (
+                  <button
+                    key={tag}
+                    onClick={() => setStyle(prev => prev ? `${prev}, ${tag}` : tag)}
+                    className="text-[10px] font-medium bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white px-2.5 py-1 rounded-full transition-colors border border-zinc-200 dark:border-white/5"
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lyrics */}
+            <div
+              ref={lyricsRef}
+              className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20 relative flex flex-col"
+              style={{ height: 'auto' }}
+            >
+              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
+                <div>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Lyrics</span>
+                    <InfoTooltip text={(taskType === 'cover' || taskType === 'audio2audio') ? 'Target lyrics for the cover. Uncheck Instrumental to use them. Lower Cover Strength gives your lyrics more influence.' : 'Lyric content and structure. Use [Verse], [Chorus], etc. Leave empty or use Instrumental for no vocals.'} />
+                  </span>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Leave empty for instrumental or switch to Instrumental below</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setInstrumental(!instrumental)}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
+                      instrumental
+                        ? 'bg-pink-600 text-white border-pink-500'
+                        : 'bg-white dark:bg-suno-card border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {instrumental ? 'Instrumental' : 'Vocal'}
+                  </button>
+                  <button
+                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
+                    title="AI Format - Enhance style & auto-fill parameters"
+                    onClick={handleFormat}
+                    disabled={isFormatting || !style.trim()}
+                  >
+                    <Sparkles size={14} />
+                  </button>
+                  <button
+                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors"
+                    onClick={() => setLyrics('')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+              <textarea
+                disabled={instrumental}
+                value={lyrics}
+                onChange={(e) => setLyrics(e.target.value)}
+                placeholder={instrumental ? "Instrumental mode - no lyrics needed" : "[Verse]\nYour lyrics here...\n\n[Chorus]\nThe catchy part..."}
+                className={`w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed ${instrumental ? 'opacity-30 cursor-not-allowed' : ''}`}
+                style={{ height: `${lyricsHeight}px` }}
+              />
+              <div
+                onMouseDown={startResizing}
+                className="h-3 w-full cursor-ns-resize flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors absolute bottom-0 left-0 z-10"
+              >
+                <div className="w-8 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"></div>
+              </div>
+            </div>
+
+            {/* Vocal Language (Custom) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Vocal Language
+                <InfoTooltip text="ISO 639-1 language code for vocals. Auto/unknown lets the model detect. Affects vocal characteristics when not in Instrumental mode." />
+              </div>
+              <select
+                value={vocalLanguage}
+                onChange={(e) => setVocalLanguage(e.target.value)}
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white focus:outline-none"
+              >
+                {VOCAL_LANGUAGES.map(lang => (
+                  <option key={lang.value} value={lang.value}>{lang.label}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 px-3 pb-2">Applies when not in Instrumental mode</p>
+            </div>
+
+            {/* Audio (optional) */}
             <div
               onDrop={(e) => handleDrop(e, audioTab)}
               onDragOver={handleDragOver}
@@ -859,7 +984,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/[0.02]">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Audio</span>
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Audio (optional)</span>
                     {referenceAudioUrl && (
                       <p className="text-[11px] text-pink-600 dark:text-pink-400 mt-0.5 truncate" title={referenceAudioUrl}>
                         Reference: {getAudioLabel(referenceAudioUrl)}
@@ -1057,109 +1182,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </div>
             </div>
 
-            {/* Lyrics Input */}
-            <div
-              ref={lyricsRef}
-              className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20 relative flex flex-col"
-              style={{ height: 'auto' }}
-            >
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 flex-shrink-0">
-                <div>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Lyrics</span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Leave empty for instrumental or toggle below</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setInstrumental(!instrumental)}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-colors ${
-                      instrumental
-                        ? 'bg-pink-600 text-white border-pink-500'
-                        : 'bg-white dark:bg-suno-card border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    {instrumental ? 'Instrumental' : 'Vocal'}
-                  </button>
-                  <button
-                    className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
-                    title="AI Format - Enhance style & auto-fill parameters"
-                    onClick={handleFormat}
-                    disabled={isFormatting || !style.trim()}
-                  >
-                    <Sparkles size={14} />
-                  </button>
-                  <button
-                    className="p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded text-zinc-500 hover:text-black dark:hover:text-white transition-colors"
-                    onClick={() => setLyrics('')}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              <textarea
-                disabled={instrumental}
-                value={lyrics}
-                onChange={(e) => setLyrics(e.target.value)}
-                placeholder={instrumental ? "Instrumental mode - no lyrics needed" : "[Verse]\nYour lyrics here...\n\n[Chorus]\nThe catchy part..."}
-                className={`w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none font-mono leading-relaxed ${instrumental ? 'opacity-30 cursor-not-allowed' : ''}`}
-                style={{ height: `${lyricsHeight}px` }}
-              />
-              {/* Resize Handle */}
-              <div
-                onMouseDown={startResizing}
-                className="h-3 w-full cursor-ns-resize flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors absolute bottom-0 left-0 z-10"
-              >
-                <div className="w-8 h-1 rounded-full bg-zinc-300 dark:bg-zinc-700"></div>
-              </div>
-            </div>
-
-            {/* Style Input */}
-            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden transition-colors group focus-within:border-zinc-400 dark:focus-within:border-white/20">
-              <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
-                <div>
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Style of Music</span>
-                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5">Genre, mood, instruments, vibe</p>
-                </div>
-                <button
-                  className={`p-1.5 hover:bg-zinc-200 dark:hover:bg-white/10 rounded transition-colors ${isFormatting ? 'text-pink-500 animate-pulse' : 'text-zinc-500 hover:text-black dark:hover:text-white'}`}
-                  title="AI Format - Enhance style & auto-fill parameters"
-                  onClick={handleFormat}
-                  disabled={isFormatting || !style.trim()}
-                >
-                  <Sparkles size={14} />
-                </button>
-              </div>
-              <textarea
-                value={style}
-                onChange={(e) => setStyle(e.target.value)}
-                placeholder="e.g. upbeat pop rock, emotional ballad, 90s hip hop"
-                className="w-full h-20 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
-              />
-              <div className="px-3 pb-3 flex flex-wrap gap-2">
-                {['Pop', 'Rock', 'Electronic', 'Hip Hop', 'Jazz', 'Classical'].map(tag => (
-                  <button
-                    key={tag}
-                    onClick={() => setStyle(prev => prev ? `${prev}, ${tag}` : tag)}
-                    className="text-[10px] font-medium bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white px-2.5 py-1 rounded-full transition-colors border border-zinc-200 dark:border-white/5"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Title Input */}
-            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
-              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
-                Title
-              </div>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Name your song"
-                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
-              />
-            </div>
           </div>
         )}
 
@@ -1181,28 +1203,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             </div>
           )}
 
-          {/* Vocal Language (Custom mode) */}
-          {customMode && !instrumental && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <span className="inline-flex items-center gap-1.5">
-                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide px-1">
-                    Vocal Language
-                  </label>
-                  <InfoTooltip text="ISO 639-1 language code for vocals. Auto/unknown lets the model detect. Affects vocal characteristics." />
-                </span>
-                <select
-                  value={vocalLanguage}
-                  onChange={(e) => setVocalLanguage(e.target.value)}
-                  className="w-full bg-white dark:bg-suno-card border border-zinc-200 dark:border-white/5 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none"
-                >
-                  {VOCAL_LANGUAGES.map(lang => (
-                    <option key={lang.value} value={lang.value}>{lang.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* MUSIC PARAMETERS */}
@@ -1683,7 +1683,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                       <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                         {taskType === 'repaint' ? 'Segment blend' : 'Source influence'}
                       </label>
-                      <InfoTooltip text={taskType === 'repaint' ? 'Blend strength for the repainted segment (0–1).' : 'How much to follow the source: 1.0 = strong adherence, 0.2 = loose style transfer.'} />
+                      <InfoTooltip text={taskType === 'repaint' ? 'Blend strength for the repainted segment (0–1).' : 'Key parameter: how much the output follows the source vs your Style/Lyrics. 1.0 = strong adherence to source; lower (e.g. 0.5–0.7) = more influence from your style and lyrics.'} />
                     </span>
                     <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">
                       {Number(audioCoverStrength).toFixed(2)}
@@ -1740,18 +1740,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 </div>
               </div>
             )}
-
-            <div className="space-y-1.5">
-              <span className="inline-flex items-center gap-1.5">
-                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Instruction</label>
-                <InfoTooltip text="Task-specific instruction prompt for the model. Default: Fill the audio semantic mask based on the given conditions." />
-              </span>
-              <textarea
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                className="w-full h-16 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg p-2 text-xs text-zinc-900 dark:text-white focus:outline-none resize-none"
-              />
-            </div>
 
             <div className="space-y-1">
               <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Guidance</h4>

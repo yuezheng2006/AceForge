@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Mic } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mic, Download, Loader2 } from 'lucide-react';
 import { toolsApi, preferencesApi } from '../services/api';
+
+const MODEL_POLL_MS = 800;
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -41,6 +43,53 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [modelReady, setModelReady] = useState<boolean | null>(null);
+  const [modelState, setModelState] = useState('');
+  const [modelMessage, setModelMessage] = useState('');
+  const [modelDownloadProgress, setModelDownloadProgress] = useState<number | null>(null);
+  const modelPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    toolsApi.voiceCloneModelStatus()
+      .then((r) => {
+        setModelReady(r.ready);
+        setModelState(r.state || '');
+        setModelMessage(r.message || '');
+      })
+      .catch(() => setModelReady(false));
+  }, []);
+
+  useEffect(() => {
+    if (modelState !== 'downloading') {
+      setModelDownloadProgress(null);
+      if (modelPollRef.current) {
+        clearInterval(modelPollRef.current);
+        modelPollRef.current = null;
+      }
+      return;
+    }
+    const poll = () => {
+      toolsApi.voiceCloneModelStatus()
+        .then((r) => {
+          setModelReady(r.ready);
+          setModelState(r.state || '');
+          setModelMessage(r.message || '');
+        })
+        .catch(() => {});
+      toolsApi.getProgress()
+        .then((p) => {
+          if (p.stage === 'voice_clone_model_download') {
+            setModelDownloadProgress(p.fraction);
+          }
+        })
+        .catch(() => {});
+    };
+    poll();
+    modelPollRef.current = setInterval(poll, MODEL_POLL_MS);
+    return () => {
+      if (modelPollRef.current) clearInterval(modelPollRef.current);
+    };
+  }, [modelState]);
 
   useEffect(() => {
     preferencesApi.get()
@@ -53,10 +102,24 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
       .catch(() => {});
   }, []);
 
+  const handleDownloadModels = () => {
+    setError(null);
+    toolsApi.voiceCloneModelEnsure().then(() => {
+      setModelState('downloading');
+      setModelMessage('Downloading XTTS voice cloning model (first use only). This may take several minutes.');
+    }).catch((e) => setError(e.message));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    if (modelReady !== true || modelState === 'downloading') {
+      setError(modelState === 'downloading'
+        ? 'Please wait for the voice cloning model download to finish.'
+        : 'Voice cloning model is not ready. Click "Download voice cloning model" first.');
+      return;
+    }
     if (!(text || '').trim()) {
       setError('Text to synthesize is required.');
       return;
@@ -118,6 +181,32 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
         Clone a voice from a reference audio file using XTTS v2. Upload a reference and enter text to synthesize.
       </p>
 
+      {modelReady === false && modelState !== 'downloading' && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+          <p className="font-medium mb-1">Voice cloning model is not downloaded yet.</p>
+          <p className="mb-2">{modelMessage || 'Click "Download voice cloning model" to download it (first use only).'}</p>
+          <button
+            type="button"
+            onClick={handleDownloadModels}
+            className="inline-flex items-center gap-1 rounded-lg bg-amber-500 text-white px-3 py-1.5 text-sm font-medium hover:bg-amber-600"
+          >
+            <Download size={14} /> Download voice cloning model
+          </button>
+        </div>
+      )}
+      {modelState === 'downloading' && (
+        <div className="mb-4 p-3 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm">
+          <p className="font-medium mb-2 flex items-center gap-2">
+            <Loader2 size={16} className="animate-spin" /> Downloading XTTS voice cloning model…
+          </p>
+          <div className="w-full h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+            <div
+              className="h-full bg-pink-500 transition-all duration-300"
+              style={{ width: modelDownloadProgress != null ? `${modelDownloadProgress * 100}%` : '30%' }}
+            />
+          </div>
+        </div>
+      )}
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 text-sm">{error}</div>
       )}
@@ -275,10 +364,16 @@ export const VoiceCloningPanel: React.FC<VoiceCloningPanelProps> = ({ onTracksUp
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || modelReady !== true || modelState === 'downloading'}
           className="rounded-lg bg-pink-500 text-white px-4 py-2 text-sm font-medium hover:bg-pink-600 disabled:opacity-50"
         >
-          {loading ? 'Cloning…' : 'Clone Voice'}
+          {modelState === 'downloading' ? (
+            <><Loader2 size={16} className="animate-spin inline mr-1" /> Downloading model…</>
+          ) : loading ? (
+            'Cloning…'
+          ) : (
+            'Clone Voice'
+          )}
         </button>
       </form>
     </div>

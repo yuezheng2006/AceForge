@@ -70,9 +70,30 @@ def _run_generation(job_id: str) -> None:
             params = {}
         # Map ace-step-ui GenerationParams to our API (support full UI payload including duration=-1, seed=-1, bpm=0)
         custom_mode = bool(params.get("customMode", False))
+        task = (params.get("taskType") or "text2music").strip().lower()
+        if task not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio"):
+            task = "text2music"
+        # Single style/caption field drives all text conditioning (ACE-Step caption).
+        # Optionally fold key, time signature, and vocal language into the prompt when set.
         prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
+        key_scale = (params.get("keyScale") or "").strip()
+        time_sig = (params.get("timeSignature") or "").strip()
+        vocal_lang = (params.get("vocalLanguage") or "").strip()
+        extra_bits = []
+        if key_scale:
+            extra_bits.append(f"key {key_scale}")
+        if time_sig:
+            extra_bits.append(f"time signature {time_sig}")
+        if vocal_lang and vocal_lang not in ("unknown", ""):
+            extra_bits.append(f"vocal language {vocal_lang}")
+        if extra_bits:
+            prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
         if not prompt:
-            prompt = "instrumental background music"
+            # For cover/audio2audio, default encourages transformation while keeping structure; otherwise generic instrumental
+            if task in ("cover", "audio2audio", "retake"):
+                prompt = "transform style while preserving structure, re-interpret with new character"
+            else:
+                prompt = "instrumental background music"
         lyrics = (params.get("lyrics") or "").strip()
         instrumental = bool(params.get("instrumental", True))
         try:
@@ -108,10 +129,6 @@ def _run_generation(job_id: str) -> None:
             except (TypeError, ValueError):
                 bpm = None
         title = (params.get("title") or "Untitled").strip() or "Track"
-        task = (params.get("taskType") or "text2music").strip().lower()
-        # Allow UI task types: text2music, retake, repaint, extend, cover, audio2audio
-        if task not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio"):
-            task = "text2music"
         reference_audio_url = (params.get("referenceAudioUrl") or params.get("reference_audio_path") or "").strip()
         source_audio_url = (params.get("sourceAudioUrl") or params.get("src_audio_path") or "").strip()
         # For cover/retake use source-first (song to cover); for style/reference use reference-first
@@ -146,6 +163,10 @@ def _run_generation(job_id: str) -> None:
         out_dir = Path(out_dir_str)
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        # ACE-Step Cover/text2music key params (see docs/ACE-Step-INFERENCE.md):
+        # caption <- prompt (style + optional keyScale, timeSignature, vocalLanguage)
+        # lyrics   <- lyrics (or "[inst]" when instrumental)
+        # src_audio, audio_cover_strength, task, repainting_* all passed through.
         summary = generate_track_ace(
             genre_prompt=prompt,
             lyrics=lyrics,

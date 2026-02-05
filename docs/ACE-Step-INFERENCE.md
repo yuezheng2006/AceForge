@@ -494,6 +494,12 @@ params = GenerationParams(
   - `0.1`: Loose interpretation
 - `lyrics`: New lyrics (if changing vocals)
 
+**Parameters that control source vs prompt/lyrics (important for Cover/Audio→Audio):**
+- **caption** (Style): target style for the output; lower `audio_cover_strength` gives it more influence.
+- **lyrics**: target lyrics; use `[Instrumental]` or instrumental flag to omit.
+- **audio_cover_strength**: 1.0 = strong adherence to source; lower (e.g. 0.5–0.7) = more influence from caption/lyrics.
+- **guidance_scale**: higher = stronger adherence to text (and to source when cover strength is high).
+
 **Use Cases**:
 - Create covers in different styles
 - Change instrumentation while keeping melody
