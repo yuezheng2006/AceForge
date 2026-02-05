@@ -1108,6 +1108,11 @@ def generate_track_ace(
         src_audio_path,
     )
 
+    # repaint_end < 0 means "end of audio" (see ACE-Step-INFERENCE.md); use target duration.
+    eff_repaint_end = float(repaint_end) if repaint_end is not None else 0.0
+    if eff_repaint_end < 0:
+        eff_repaint_end = requested_total
+
     out_path = _next_available_output_path(out_dir, basename, ext=".wav")
 
     print(
@@ -1148,7 +1153,7 @@ def generate_track_ace(
         oss_steps=oss_steps,
         task=task,
         repaint_start=float(repaint_start),
-        repaint_end=float(repaint_end),
+        repaint_end=eff_repaint_end,
         retake_variance=float(retake_variance),
         src_audio_path=src_audio_path,
         audio2audio_enable=bool(audio2audio_enable),

@@ -108,10 +108,12 @@ def _run_generation(job_id: str) -> None:
         except (TypeError, ValueError):
             steps = 55
         steps = max(1, min(100, steps))
+        # Doc recommends 7.0 default; higher helps adherence to caption and reference (see ACE-Step-INFERENCE.md).
         try:
-            guidance_scale = float(params.get("guidanceScale") or 6.0)
+            guidance_default = 7.0 if src_audio_path else 6.0
+            guidance_scale = float(params.get("guidanceScale") or guidance_default)
         except (TypeError, ValueError):
-            guidance_scale = 6.0
+            guidance_scale = 7.0 if src_audio_path else 6.0
         try:
             seed = int(params.get("seed") or 0)
         except (TypeError, ValueError):
@@ -139,12 +141,14 @@ def _run_generation(job_id: str) -> None:
             resolved = _resolve_audio_url_to_path(reference_audio_url) if reference_audio_url else None
             src_audio_path = resolved or (_resolve_audio_url_to_path(source_audio_url) if source_audio_url else None)
 
-        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint)
+        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint).
+        # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; 0.5–0.8 = more caption influence.
         audio2audio_enable = bool(src_audio_path)
-        ref_audio_strength = float(params.get("audioCoverStrength") or params.get("ref_audio_strength") or 0.7)
+        ref_default = 0.8 if task in ("cover", "retake", "audio2audio") else 0.7
+        ref_audio_strength = float(params.get("audioCoverStrength") or params.get("ref_audio_strength") or ref_default)
         ref_audio_strength = max(0.0, min(1.0, ref_audio_strength))
 
-        # Repaint segment (for task=repaint); -1 means end of audio
+        # Repaint segment (for task=repaint); -1 means end of audio (converted to duration in generate_track_ace).
         try:
             repaint_start = float(params.get("repaintingStart") or params.get("repaint_start") or 0)
         except (TypeError, ValueError):
@@ -153,6 +157,7 @@ def _run_generation(job_id: str) -> None:
             repaint_end = float(params.get("repaintingEnd") or params.get("repaint_end") or -1)
         except (TypeError, ValueError):
             repaint_end = -1.0
+        # -1 means "end of audio"; generate_track_ace converts to target duration
 
         if src_audio_path:
             logging.info("[API generate] Using reference audio: %s (task=%s, audio2audio=%s)", src_audio_path, task, audio2audio_enable)
@@ -163,10 +168,9 @@ def _run_generation(job_id: str) -> None:
         out_dir = Path(out_dir_str)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # ACE-Step Cover/text2music key params (see docs/ACE-Step-INFERENCE.md):
-        # caption <- prompt (style + optional keyScale, timeSignature, vocalLanguage)
-        # lyrics   <- lyrics (or "[inst]" when instrumental)
-        # src_audio, audio_cover_strength, task, repainting_* all passed through.
+        # ACE-Step params aligned with docs/ACE-Step-INFERENCE.md:
+        # caption/style, lyrics, src_audio (→ ref_audio_input for cover/retake), audio_cover_strength,
+        # task, repainting_*; guidance_scale 7.0 when using reference improves adherence.
         summary = generate_track_ace(
             genre_prompt=prompt,
             lyrics=lyrics,

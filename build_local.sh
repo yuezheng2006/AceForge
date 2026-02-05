@@ -3,6 +3,12 @@
 #  AceForge - Local Build Script
 #  Builds the PyInstaller app bundle for local testing.
 #  Includes the new React UI (ui/) when present; requires Bun (https://bun.sh).
+#
+#  Optional env vars (safe, non-destructive caching for faster rebuilds):
+#    ACEFORGE_QUICK_BUILD=1  - Reuse PyInstaller cache (omit --clean, keep build/AceForge).
+#                              Use when only code changed; full clean build if things break.
+#    ACEFORGE_SKIP_UI_BUILD=1 - Skip UI build; use existing ui/dist/. Use when only Python changed.
+#    ACEFORGE_SKIP_PIP=1     - Skip venv/pip steps. Use when deps unchanged and venv already ready.
 # ---------------------------------------------------------------------------
 
 set -e  # Exit on error
@@ -17,17 +23,25 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
 # ---------------------------------------------------------------------------
-# Always build new UI (React/Vite) with Bun when ui/ exists; required for full app.
+# Build new UI (React/Vite) with Bun when ui/ exists; skip if ACEFORGE_SKIP_UI_BUILD=1.
 # ---------------------------------------------------------------------------
 UI_DIR="${APP_DIR}/ui"
 if [ -f "$UI_DIR/package.json" ]; then
-    if ! command -v bun &> /dev/null; then
-        echo "ERROR: Bun is required to build the new UI. Install from https://bun.sh"
-        exit 1
+    if [ -n "${ACEFORGE_SKIP_UI_BUILD}" ]; then
+        if [ ! -f "$UI_DIR/dist/index.html" ]; then
+            echo "ERROR: ACEFORGE_SKIP_UI_BUILD is set but ui/dist/index.html not found. Run without it once."
+            exit 1
+        fi
+        echo "[Build] Skipping UI build (ACEFORGE_SKIP_UI_BUILD)"
+    else
+        if ! command -v bun &> /dev/null; then
+            echo "ERROR: Bun is required to build the new UI. Install from https://bun.sh"
+            exit 1
+        fi
+        echo "[Build] Building new UI (React SPA) with Bun..."
+        "${APP_DIR}/scripts/build_ui.sh"
+        echo "[Build] New UI build OK"
     fi
-    echo "[Build] Building new UI (React SPA) with Bun..."
-    "${APP_DIR}/scripts/build_ui.sh"
-    echo "[Build] New UI build OK"
 else
     echo "ERROR: ui/package.json not found. The new UI source is required for the full app build."
     exit 1
@@ -65,6 +79,10 @@ VENV_PY="${VENV_DIR}/bin/python"
 
 # Create/activate virtual environment
 if [ ! -f "$VENV_PY" ]; then
+    if [ -n "${ACEFORGE_SKIP_PIP}" ]; then
+        echo "ERROR: ACEFORGE_SKIP_PIP is set but venv_build not found. Run without it once."
+        exit 1
+    fi
     echo "[Build] Creating virtual environment..."
     $PYTHON_CMD -m venv "$VENV_DIR"
 fi
@@ -75,6 +93,7 @@ source "${VENV_DIR}/bin/activate"
 # Use venv Python for all installs and PyInstaller (ensures TTS and deps are in the bundle)
 PY="${VENV_PY}"
 
+if [ -z "${ACEFORGE_SKIP_PIP}" ]; then
 # Upgrade pip
 echo "[Build] Upgrading pip..."
 "$PY" -m pip install --upgrade pip --quiet
@@ -137,7 +156,14 @@ fi
 
 "$PY" -m pip install "pyinstaller>=6.0" --quiet
 
-# Check for PyInstaller
+# One last pass right before bundling, in case anything reintroduced Sudachi.
+echo "[Build] Final check: removing Japanese Sudachi packages (if present)..."
+"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
+else
+    echo "[Build] Skipping pip steps (ACEFORGE_SKIP_PIP)"
+fi
+
+# Check for PyInstaller (always run)
 if ! "$PY" -m PyInstaller --version &> /dev/null; then
     echo "ERROR: PyInstaller not found. Please install it:"
     echo "  $PY -m pip install pyinstaller"
@@ -147,15 +173,17 @@ fi
 echo "[Build] PyInstaller version: $("$PY" -m PyInstaller --version)"
 echo ""
 
-# One last pass right before bundling, in case anything reintroduced Sudachi.
-echo "[Build] Final check: removing Japanese Sudachi packages (if present)..."
-"$PY" -m pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy >/dev/null 2>&1 || true
-
 # Clean previous builds (PyInstaller outputs only).
 # NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
 # NEVER delete ui/dist/ — may have been produced by the new UI build above.
-echo "[Build] Cleaning previous PyInstaller builds..."
-rm -rf dist/AceForge.app dist/CDMF build/AceForge
+# ACEFORGE_QUICK_BUILD=1: keep build/AceForge so PyInstaller can reuse cache.
+if [ -n "${ACEFORGE_QUICK_BUILD}" ]; then
+    echo "[Build] Quick build: reusing PyInstaller cache (keeping build/AceForge)"
+    rm -rf dist/AceForge.app dist/CDMF
+else
+    echo "[Build] Cleaning previous PyInstaller builds..."
+    rm -rf dist/AceForge.app dist/CDMF build/AceForge
+fi
 
 # Safeguard: build/macos must exist for the app icon and code signing
 if [ ! -f "build/macos/AceForge.icns" ]; then
@@ -164,10 +192,14 @@ if [ ! -f "build/macos/AceForge.icns" ]; then
     exit 1
 fi
 
-# Build with PyInstaller
+# Build with PyInstaller (omit --clean when ACEFORGE_QUICK_BUILD=1 to reuse cache)
 echo "[Build] Building app bundle with PyInstaller..."
 echo "This may take several minutes..."
-"$PY" -m PyInstaller CDMF.spec --clean --noconfirm
+if [ -n "${ACEFORGE_QUICK_BUILD}" ]; then
+    "$PY" -m PyInstaller CDMF.spec --noconfirm
+else
+    "$PY" -m PyInstaller CDMF.spec --clean --noconfirm
+fi
 
 # Check if build succeeded
 BUNDLED_APP="${APP_DIR}/dist/AceForge.app"
