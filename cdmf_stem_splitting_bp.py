@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 
 import cdmf_tracks
 import cdmf_state
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION
+from cdmf_paths import APP_VERSION, get_output_dir
 from cdmf_stem_splitting import get_stem_splitter
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
                 export_format = "wav"
             
             # Get output directory (same as music generation)
-            out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
+            out_dir = request.form.get("out_dir") or get_output_dir()
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
             
@@ -167,6 +167,11 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
                         entry["out_dir"] = str(out_dir_path)
                         entry["original_file"] = str(temp_input_path)
                         entry["input_file"] = str(temp_input_path)  # Full path for consistency
+                        # Producer tag for library/filtering
+                        tags = list(entry.get("tags") or [])
+                        if "stems" not in tags:
+                            tags.append("stems")
+                        entry["tags"] = tags
                         # Save base_filename if provided
                         base_filename = request.form.get("base_filename", "").strip()
                         if base_filename:

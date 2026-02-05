@@ -1,5 +1,5 @@
 import React from 'react';
-import { Library, Disc, Search, Terminal, Sun, Moon } from 'lucide-react';
+import { Library, Disc, Search, Terminal, Sun, Moon, GraduationCap, Layers, Mic, Music2 } from 'lucide-react';
 import { View } from '../types';
 
 interface SidebarProps {
@@ -25,15 +25,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex flex-col h-full bg-white dark:bg-suno-sidebar border-r border-zinc-200 dark:border-white/5 flex-shrink-0 w-[72px] items-center py-4 z-30 transition-colors duration-300 overflow-y-auto scrollbar-hide">
       {/* Logo */}
       <div
-        className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center mb-8 cursor-pointer shadow-lg hover:scale-105 transition-transform"
+        className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center mb-8 cursor-pointer shadow-lg hover:scale-105 transition-transform bg-zinc-100 dark:bg-zinc-800"
         onClick={() => onNavigate('create')}
-        title="ACE-Step UI"
+        title="AceForge"
       >
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white">
-          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <img src="/static/aceforge_logo.png" alt="AceForge" className="w-full h-full object-cover" />
       </div>
 
       <nav className="flex-1 flex flex-col gap-4 w-full px-3">
@@ -54,6 +50,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label="Search"
           active={currentView === 'search'}
           onClick={() => onNavigate('search')}
+        />
+        <NavItem
+          icon={<GraduationCap size={24} />}
+          label="Training"
+          active={currentView === 'training'}
+          onClick={() => onNavigate('training')}
+        />
+        <NavItem
+          icon={<Layers size={24} />}
+          label="Stem Splitting"
+          active={currentView === 'stem-splitting'}
+          onClick={() => onNavigate('stem-splitting')}
+        />
+        <NavItem
+          icon={<Mic size={24} />}
+          label="Voice Cloning"
+          active={currentView === 'voice-cloning'}
+          onClick={() => onNavigate('voice-cloning')}
+        />
+        <NavItem
+          icon={<Music2 size={24} />}
+          label="Audio to MIDI"
+          active={currentView === 'midi'}
+          onClick={() => onNavigate('midi')}
         />
 
         <div className="mt-auto flex flex-col gap-4">

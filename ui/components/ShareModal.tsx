@@ -60,12 +60,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, song })
   const shareUrl = `${window.location.origin}/song/${song.id}`;
 
   // Platform-specific share text for better engagement
-  const defaultShareText = `🎵 "${song.title}" ${song.style ? `(${song.style})` : ''} - Made with ACE-Step UI`;
-  const twitterText = `🔥 Just created "${song.title}" with ACE-Step UI - local AI music generation! ${song.style ? `#${song.style.replace(/\s+/g, '')}` : ''} #AIMusic #ACEStep`;
-  const redditTitle = `[AI Music] ${song.title} - ${song.style || 'Original'} | Created with ACE-Step UI`;
-  const whatsAppText = `🎧 Listen to this AI-generated song!\n\n"${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `Genre: ${song.style}` : ''}\n\nMade with ACE-Step UI - free and open source!`;
-  const telegramText = `🎵 "${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `🎸 ${song.style}` : ''}\n\n🤖 Made with ACE-Step UI`;
-  const linkedInText = `Check out this AI-generated music: "${song.title}" - Created locally with ACE-Step. #AIMusic #MusicTech #OpenSource`;
+  const defaultShareText = `🎵 "${song.title}" ${song.style ? `(${song.style})` : ''} - Made with AceForge`;
+  const twitterText = `🔥 Just created "${song.title}" with AceForge - AI music workstation! ${song.style ? `#${song.style.replace(/\s+/g, '')}` : ''} #AIMusic #AceForge`;
+  const redditTitle = `[AI Music] ${song.title} - ${song.style || 'Original'} | Created with AceForge`;
+  const whatsAppText = `🎧 Listen to this AI-generated song!\n\n"${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `Genre: ${song.style}` : ''}\n\nMade with AceForge - free and open source!`;
+  const telegramText = `🎵 "${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `🎸 ${song.style}` : ''}\n\n🤖 Made with AceForge`;
+  const linkedInText = `Check out this AI-generated music: "${song.title}" - Created locally with AceForge. #AIMusic #MusicTech #OpenSource`;
 
   const handleShareX = () => {
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}&url=${encodeURIComponent(shareUrl)}`;
@@ -99,7 +99,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, song })
 
   const handleShareEmail = () => {
     const subject = encodeURIComponent(`🎵 Check out this AI song: ${song.title}`);
-    const body = encodeURIComponent(`Hey!\n\nI created this AI-generated song and thought you'd love it:\n\n"${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `Genre: ${song.style}` : ''}\n\n🎧 Listen here: ${shareUrl}\n\n🤖 Made with ACE-Step UI - free and open source local AI music generation!`);
+    const body = encodeURIComponent(`Hey!\n\nI created this AI-generated song and thought you'd love it:\n\n"${song.title}" by ${song.creator || 'Unknown Artist'}\n${song.style ? `Genre: ${song.style}` : ''}\n\n🎧 Listen here: ${shareUrl}\n\n🤖 Made with AceForge - free and open source AI music workstation!`);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 

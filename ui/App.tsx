@@ -12,13 +12,17 @@ import { SettingsModal } from './components/SettingsModal';
 import { ConsolePanel } from './components/ConsolePanel';
 import { SongProfile } from './components/SongProfile';
 import { Song, GenerationParams, View, Playlist } from './types';
-import { generateApi, songsApi, playlistsApi, getAudioUrl } from './services/api';
+import { generateApi, songsApi, playlistsApi, getAudioUrl, preferencesApi } from './services/api';
 import { useAuth } from './context/AuthContext';
 import { useResponsive } from './context/ResponsiveContext';
 import { List } from 'lucide-react';
 import { PlaylistDetail } from './components/PlaylistDetail';
 import { Toast, ToastType } from './components/Toast';
 import { SearchPage } from './components/SearchPage';
+import { TrainingPanel } from './components/TrainingPanel';
+import { StemSplittingPanel } from './components/StemSplittingPanel';
+import { VoiceCloningPanel } from './components/VoiceCloningPanel';
+import { MidiPanel } from './components/MidiPanel';
 
 
 export default function App() {
@@ -236,6 +240,14 @@ export default function App() {
         }
       } else if (path === '/search') {
         setCurrentView('search');
+      } else if (path === '/training') {
+        setCurrentView('training');
+      } else if (path === '/stem-splitting') {
+        setCurrentView('stem-splitting');
+      } else if (path === '/voice-cloning') {
+        setCurrentView('voice-cloning');
+      } else if (path === '/midi') {
+        setCurrentView('midi');
       }
     };
 
@@ -555,8 +567,8 @@ export default function App() {
     setShowRightSidebar(true);
 
     try {
-      console.log('[Create] Calling POST /api/generate');
-      const job = await generateApi.startGeneration({
+      const prefs = await preferencesApi.get();
+      const genParams = {
         customMode: params.customMode,
         songDescription: params.songDescription,
         lyrics: params.lyrics,
@@ -607,7 +619,10 @@ export default function App() {
         trackName: params.trackName,
         completeTrackClasses: params.completeTrackClasses,
         isFormatCaption: params.isFormatCaption,
-      }, token ?? '');
+        ...(prefs.output_dir ? { outputDir: prefs.output_dir } : {}),
+      };
+      console.log('[Create] Calling POST /api/generate');
+      const job = await generateApi.startGeneration(genParams, token ?? '');
 
       // Poll for completion - each job has its own polling interval
       const pollInterval = setInterval(async () => {
@@ -929,6 +944,80 @@ export default function App() {
           />
         );
 
+      case 'training':
+      case 'stem-splitting':
+      case 'voice-cloning':
+      case 'midi':
+        return (
+          <div className="flex h-full overflow-hidden relative w-full">
+            <div
+              className={`
+                ${mobileShowList ? 'hidden md:block' : 'w-full'}
+                md:w-[320px] lg:w-[360px] flex-shrink-0 h-full border-r border-zinc-200 dark:border-white/5 bg-zinc-50 dark:bg-suno-panel relative z-10 transition-colors duration-300
+              `}
+            >
+              {currentView === 'training' && <TrainingPanel onTracksUpdated={refreshSongsList} />}
+              {currentView === 'stem-splitting' && <StemSplittingPanel onTracksUpdated={refreshSongsList} />}
+              {currentView === 'voice-cloning' && <VoiceCloningPanel onTracksUpdated={refreshSongsList} />}
+              {currentView === 'midi' && <MidiPanel onTracksUpdated={refreshSongsList} />}
+            </div>
+            <div
+              className={`
+                ${!mobileShowList ? 'hidden md:flex' : 'flex'}
+                flex-1 flex-col h-full overflow-hidden bg-white dark:bg-suno-DEFAULT transition-colors duration-300
+              `}
+            >
+              <SongList
+                songs={songs}
+                currentSong={currentSong}
+                selectedSong={selectedSong}
+                likedSongIds={likedSongIds}
+                isPlaying={isPlaying}
+                onPlay={playSong}
+                onSelect={(s) => {
+                  setSelectedSong(s);
+                  setShowRightSidebar(true);
+                }}
+                onToggleLike={toggleLike}
+                onAddToPlaylist={openAddToPlaylistModal}
+                onOpenVideo={openVideoGenerator}
+                onShowDetails={handleShowDetails}
+                onNavigateToProfile={handleNavigateToProfile}
+                onReusePrompt={handleReuse}
+                onDelete={handleDeleteSong}
+              />
+            </div>
+            {showRightSidebar && (
+              <div className="hidden xl:block w-[360px] flex-shrink-0 h-full bg-zinc-50 dark:bg-suno-panel relative z-10 border-l border-zinc-200 dark:border-white/5 transition-colors duration-300">
+                <RightSidebar
+                  song={selectedSong}
+                  onClose={() => setShowRightSidebar(false)}
+                  onOpenVideo={() => selectedSong && openVideoGenerator(selectedSong)}
+                  onReuse={handleReuse}
+                  onSongUpdate={handleSongUpdate}
+                  onNavigateToProfile={handleNavigateToProfile}
+                  onNavigateToSong={handleNavigateToSong}
+                  isLiked={selectedSong ? likedSongIds.has(selectedSong.id) : false}
+                  onToggleLike={toggleLike}
+                  onPlay={playSong}
+                  isPlaying={isPlaying}
+                  currentSong={currentSong}
+                  onDelete={handleDeleteSong}
+                />
+              </div>
+            )}
+            <div className="md:hidden absolute top-4 right-4 z-50">
+              <button
+                onClick={() => setMobileShowList(!mobileShowList)}
+                className="bg-zinc-800 text-white px-4 py-2 rounded-full shadow-lg border border-white/10 flex items-center gap-2 text-sm font-bold"
+              >
+                {mobileShowList ? 'Tools' : 'View List'}
+                <List size={16} />
+              </button>
+            </div>
+          </div>
+        );
+
       case 'create':
       default:
         return (
@@ -1021,6 +1110,14 @@ export default function App() {
               window.history.pushState({}, '', '/library');
             } else if (v === 'search') {
               window.history.pushState({}, '', '/search');
+            } else if (v === 'training') {
+              window.history.pushState({}, '', '/training');
+            } else if (v === 'stem-splitting') {
+              window.history.pushState({}, '', '/stem-splitting');
+            } else if (v === 'voice-cloning') {
+              window.history.pushState({}, '', '/voice-cloning');
+            } else if (v === 'midi') {
+              window.history.pushState({}, '', '/midi');
             }
           }}
           theme={theme}

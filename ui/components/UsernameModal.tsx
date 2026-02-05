@@ -51,14 +51,14 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ isOpen, onSubmit }
         <div className="p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <Sparkles className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center shadow-lg bg-white dark:bg-zinc-800">
+              <img src="/static/aceforge_logo.png" alt="AceForge" className="w-full h-full object-cover" />
             </div>
           </div>
 
           {/* Title */}
           <h2 className="text-2xl font-bold text-center text-white mb-2">
-            Welcome to ACE-Step UI
+            Welcome to AceForge
           </h2>
           <p className="text-zinc-400 text-center mb-8">
             Enter your name to get started creating AI music

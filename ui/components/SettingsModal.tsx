@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EditProfileModal } from './EditProfileModal';
+import { preferencesApi } from '../services/api';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -14,6 +15,22 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
     const { user } = useAuth();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [outputDir, setOutputDir] = useState('');
+    const [outputDirSaved, setOutputDirSaved] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            preferencesApi.get()
+                .then((prefs) => setOutputDir(prefs.output_dir ?? ''))
+                .catch(() => {});
+        }
+    }, [isOpen]);
+
+    const saveOutputDir = () => {
+        preferencesApi.update({ output_dir: outputDir.trim() || undefined })
+            .then(() => { setOutputDirSaved(true); setTimeout(() => setOutputDirSaved(false), 2000); })
+            .catch(() => {});
+    };
 
     if (!isOpen || !user) {
         if (isEditProfileOpen && user) {
@@ -101,6 +118,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         </div>
                     </div>
 
+                    {/* Output directory (global for generation, stems, voice clone, MIDI) */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <FolderOpen size={20} />
+                            <h3 className="font-semibold">Output</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={outputDir}
+                                        onChange={(e) => setOutputDir(e.target.value)}
+                                        onBlur={saveOutputDir}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveOutputDir}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {outputDirSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Theme Section */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
@@ -139,26 +187,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         </div>
                         <div className="pl-7 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
                             <p>Version 1.0.0</p>
-                            <p>ACE-Step UI - Local AI Music Generator</p>
+                            <p>AceForge - AI Music Workstation</p>
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
                                 Powered by ACE-Step 1.5. Open source and free to use.
                             </p>
                             <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/50 mt-4">
-                                <p className="text-zinc-900 dark:text-white font-medium mb-3">Created by Ambsd</p>
+                                <p className="text-zinc-900 dark:text-white font-medium mb-3">AceForge</p>
                                 <div className="flex flex-wrap gap-2">
                                     <a
-                                        href="https://x.com/AmbsdOP"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-4 py-2 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-                                    >
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                        </svg>
-                                        Follow @AmbsdOP
-                                    </a>
-                                    <a
-                                        href="https://github.com/fspecii/ace-step-ui"
+                                        href="https://github.com/audiohacking/AceForge"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors"

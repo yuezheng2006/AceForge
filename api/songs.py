@@ -1,5 +1,5 @@
 """
-Songs API for new UI. Maps AceForge tracks (DEFAULT_OUT_DIR + TRACK_META_PATH) and
+Songs API for new UI. Maps AceForge tracks (configured output dir + TRACK_META_PATH) and
 uploaded reference tracks to the Express song contract. No auth.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_from_directory
 
 import cdmf_tracks
-from cdmf_paths import DEFAULT_OUT_DIR, TRACK_META_PATH, get_user_data_dir
+from cdmf_paths import get_output_dir, TRACK_META_PATH, get_user_data_dir
 
 bp = Blueprint("api_songs", __name__)
 
@@ -30,7 +30,7 @@ def _save_track_meta(meta: dict) -> None:
 
 
 def _music_dir() -> Path:
-    return Path(DEFAULT_OUT_DIR)
+    return Path(get_output_dir())
 
 
 def _filename_to_id(name: str) -> str:
@@ -271,7 +271,7 @@ def create_song():
     """POST /api/songs — create song record (e.g. after generation). Called by adapter."""
     data = request.get_json(silent=True) or {}
     # We don't persist to a separate DB; tracks are files. So create is no-op for listing.
-    # Generation adapter will write the file to DEFAULT_OUT_DIR and metadata to TRACK_META_PATH.
+    # Generation adapter will write the file to configured output dir and metadata to TRACK_META_PATH.
     return jsonify({"song": data}), 201
 
 

@@ -14,7 +14,7 @@ from flask import Blueprint, request, jsonify, send_from_directory
 
 import cdmf_state
 from cdmf_paths import (
-    DEFAULT_OUT_DIR,
+    get_output_dir,
     PRESETS_PATH,
     TRACK_META_PATH,
     USER_PRESETS_PATH,
@@ -123,8 +123,8 @@ def get_audio_duration(path: Path) -> float:
 
 
 def list_music_files() -> List[str]:
-    """Return a sorted list of .wav, .mp3, and .mid files in the default music directory."""
-    music_dir = Path(DEFAULT_OUT_DIR)
+    """Return a sorted list of .wav, .mp3, and .mid files in the configured output directory."""
+    music_dir = Path(get_output_dir())
     if not music_dir.exists():
         return []
     names = [
@@ -185,7 +185,7 @@ def create_tracks_blueprint() -> Blueprint:
     @bp.route("/music/<path:filename>")
     def serve_music(filename: str):
         """Serve audio files from the AceForge music directory."""
-        return send_from_directory(DEFAULT_OUT_DIR, filename)
+        return send_from_directory(get_output_dir(), filename)
 
     @bp.route("/progress", methods=["GET"])
     def get_progress():
@@ -232,7 +232,7 @@ def create_tracks_blueprint() -> Blueprint:
         tracks = list_music_files()
         meta = load_track_meta()
 
-        music_dir = Path(DEFAULT_OUT_DIR)
+        music_dir = Path(get_output_dir())
 
         # Prefer the last generated track, if it's in the list
         with cdmf_state.PROGRESS_LOCK:
@@ -294,7 +294,7 @@ def create_tracks_blueprint() -> Blueprint:
             if not name:
                 return jsonify({"error": "Missing track name"}), 400
 
-            track_path = Path(DEFAULT_OUT_DIR) / name
+            track_path = Path(get_output_dir()) / name
             if not track_path.is_file():
                 return jsonify({"error": "Track not found"}), 404
 
@@ -311,7 +311,7 @@ def create_tracks_blueprint() -> Blueprint:
         if not name:
             return jsonify({"error": "Missing track name"}), 400
 
-        track_path = Path(DEFAULT_OUT_DIR) / name
+        track_path = Path(get_output_dir()) / name
         if not track_path.is_file():
             return jsonify({"error": "Track not found"}), 404
 
@@ -418,8 +418,8 @@ def create_tracks_blueprint() -> Blueprint:
             return jsonify({"error": "New track name cannot be empty."}), 400
         final_name = new_base + ".wav"
 
-        old_path = Path(DEFAULT_OUT_DIR) / (old_base + ".wav")
-        new_path = Path(DEFAULT_OUT_DIR) / final_name
+        old_path = Path(get_output_dir()) / (old_base + ".wav")
+        new_path = Path(get_output_dir()) / final_name
 
         if not old_path.is_file():
             return jsonify({"error": "Original track not found."}), 404
@@ -457,7 +457,7 @@ def create_tracks_blueprint() -> Blueprint:
         if not name:
             return jsonify({"error": "Missing track name"}), 400
 
-        track_path = Path(DEFAULT_OUT_DIR) / name
+        track_path = Path(get_output_dir()) / name
         if not track_path.is_file():
             return jsonify({"error": "Track not found"}), 404
 
@@ -491,7 +491,7 @@ def create_tracks_blueprint() -> Blueprint:
         if "/" in name or "\\" in name or ".." in name:
             return jsonify({"ok": False, "error": "Invalid track name"}), 400
 
-        track_path = Path(DEFAULT_OUT_DIR) / name
+        track_path = Path(get_output_dir()) / name
         if not track_path.is_file():
             return jsonify({"ok": False, "error": "Track not found"}), 404
 

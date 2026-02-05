@@ -19,7 +19,7 @@ import cdmf_state
 import cdmf_tracks
 from cdmf_paths import (
     APP_DIR,
-    DEFAULT_OUT_DIR,
+    get_output_dir,
     TRAINING_DATA_ROOT,
     CUSTOM_LORA_ROOT,
     SEED_VIBES,
@@ -134,9 +134,9 @@ def create_generation_blueprint(
             UI_DEFAULT_VOCAL_GAIN_DB=UI_DEFAULT_VOCAL_GAIN_DB,
             UI_DEFAULT_INSTRUMENTAL_GAIN_DB=UI_DEFAULT_INSTRUMENTAL_GAIN_DB,
             seed=0,
-            out_dir=DEFAULT_OUT_DIR,
+            out_dir=get_output_dir(),
             basename="Candy Dreams",
-            default_out_dir=DEFAULT_OUT_DIR,
+            default_out_dir=get_output_dir(),
             seed_vibe="any",
             seed_vibes=SEED_VIBES,
             message=None,
@@ -401,7 +401,7 @@ def create_generation_blueprint(
             # Misc / shared fields
             seed = int(request.form.get("seed", "0"))
             out_dir = (
-                request.form.get("out_dir", DEFAULT_OUT_DIR).strip() or DEFAULT_OUT_DIR
+                (request.form.get("out_dir") or "").strip() or get_output_dir()
             )
             basename = request.form.get("basename", "").strip()
             if not basename:
@@ -588,6 +588,10 @@ def create_generation_blueprint(
                 )
                 entry["lora_weight"] = summary.get("lora_weight", lora_weight)
                 entry["generator"] = "gen"
+                tags = list(entry.get("tags") or [])
+                if "generation" not in tags:
+                    tags.append("generation")
+                entry["tags"] = tags
                 # Save input file as full path when available
                 if src_audio_path:
                     entry["input_file"] = src_audio_path
@@ -606,7 +610,7 @@ def create_generation_blueprint(
                 )
 
             current_track = None
-            if wav_path.parent.resolve() == Path(DEFAULT_OUT_DIR).resolve():
+            if wav_path.parent.resolve() == Path(get_output_dir()).resolve():
                 current_track = wav_path.name
 
             with cdmf_state.PROGRESS_LOCK:
@@ -660,7 +664,7 @@ def create_generation_blueprint(
                 seed=summary["seed"],
                 out_dir=str(out_dir_path),
                 basename=basename,
-                default_out_dir=DEFAULT_OUT_DIR,
+                default_out_dir=get_output_dir(),
                 seed_vibe=seed_vibe,
                 seed_vibes=SEED_VIBES,
                 instrumental=instrumental,
@@ -722,9 +726,9 @@ def create_generation_blueprint(
                 UI_DEFAULT_VOCAL_GAIN_DB=UI_DEFAULT_VOCAL_GAIN_DB,
                 UI_DEFAULT_INSTRUMENTAL_GAIN_DB=UI_DEFAULT_INSTRUMENTAL_GAIN_DB,
                 seed=request.form.get("seed", "0"),
-                out_dir=request.form.get("out_dir", DEFAULT_OUT_DIR),
+                out_dir=request.form.get("out_dir") or get_output_dir(),
                 basename=request.form.get("basename", "Candy Dreams"),
-                default_out_dir=DEFAULT_OUT_DIR,
+                default_out_dir=get_output_dir(),
                 seed_vibe=request.form.get("seed_vibe", "any"),
                 seed_vibes=SEED_VIBES,
                 instrumental=instrumental,

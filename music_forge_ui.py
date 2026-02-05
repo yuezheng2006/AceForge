@@ -381,6 +381,7 @@ try:
         contact_bp,
         reference_tracks_bp,
         search_bp,
+        preferences_bp,
     )
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(songs_bp, url_prefix="/api/songs")
@@ -390,6 +391,7 @@ try:
     app.register_blueprint(contact_bp, url_prefix="/api/contact")
     app.register_blueprint(reference_tracks_bp, url_prefix="/api/reference-tracks")
     app.register_blueprint(search_bp, url_prefix="/api/search")
+    app.register_blueprint(preferences_bp, url_prefix="/api/preferences")
 except ImportError as e:
     print(f"[AceForge] New UI API not available: {e}", flush=True)
 

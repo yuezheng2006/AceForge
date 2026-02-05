@@ -10,6 +10,7 @@ from api.users import bp as users_bp
 from api.contact import bp as contact_bp
 from api.reference_tracks import bp as reference_tracks_bp
 from api.search import bp as search_bp
+from api.preferences import bp as preferences_bp
 
 __all__ = [
     "auth_bp",
@@ -20,4 +21,5 @@ __all__ = [
     "contact_bp",
     "reference_tracks_bp",
     "search_bp",
+    "preferences_bp",
 ]

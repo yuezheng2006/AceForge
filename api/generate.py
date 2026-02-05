@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
 
-from cdmf_paths import DEFAULT_OUT_DIR, get_user_data_dir
+from cdmf_paths import get_output_dir, get_user_data_dir
 
 bp = Blueprint("api_generate", __name__)
 
@@ -48,7 +48,7 @@ def _resolve_audio_url_to_path(url: str) -> str | None:
         return str(path) if path.is_file() else None
     if url.startswith("/audio/"):
         name = url.replace("/audio/", "", 1).split("?")[0]
-        path = Path(DEFAULT_OUT_DIR) / name
+        path = Path(get_output_dir()) / name
         return str(path) if path.is_file() else None
     return None
 
@@ -142,7 +142,8 @@ def _run_generation(job_id: str) -> None:
         else:
             logging.info("[API generate] No reference audio; text2music only")
 
-        out_dir = Path(DEFAULT_OUT_DIR)
+        out_dir_str = params.get("outputDir") or params.get("output_dir") or get_output_dir()
+        out_dir = Path(out_dir_str)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         summary = generate_track_ace(
@@ -343,7 +344,7 @@ def get_audio():
     if path_arg.startswith("refs/"):
         local = _refs_dir() / path_arg.replace("refs/", "", 1)
     else:
-        local = Path(DEFAULT_OUT_DIR) / path_arg
+        local = Path(get_output_dir()) / path_arg
     if not local.is_file():
         return jsonify({"error": "File not found"}), 404
     return send_file(local, as_attachment=False, download_name=local.name)
