@@ -16,6 +16,7 @@ static_dir = spec_root / 'static'
 training_config_dir = spec_root / 'training_config'
 ace_models_dir = spec_root / 'ace_models'
 icon_path = spec_root / 'build' / 'macos' / 'AceForge.icns'
+ui_dist_dir = spec_root / 'ui' / 'dist'
 
 # Collect _lzma binary explicitly (critical for py3langid in frozen apps)
 # PyInstaller should auto-detect it, but we ensure it's included
@@ -216,7 +217,8 @@ a = Analysis(
         ('presets.json', '.'),
         # Include VERSION file (placed in MacOS directory for frozen apps)
         ('VERSION', '.'),
-    ] + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _basic_pitch_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data + _demucs_data,
+        # Include new React UI (built by build_local.sh / scripts/build_ui.sh)
+    ] + ([(str(ui_dist_dir), 'ui/dist')] if ui_dist_dir.is_dir() else []) + _py3langid_data + _acestep_lyrics_data + _tokenizers_data + _basic_pitch_data + _tts_data + _tts_vocoder_configs + _trainer_data + _gruut_data + _jamo_data + _demucs_data,
     hiddenimports=[
         'diffusers',
         'diffusers.loaders',

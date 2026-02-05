@@ -81,10 +81,11 @@ def create_generation_blueprint(
     html_template: str,
     ui_defaults: Dict[str, Any],
     generate_track_ace: Callable[..., Dict[str, Any]],
+    serve_index: bool = True,
 ) -> Blueprint:
     """
     Create a blueprint that defines:
-      * "/"       -> index page
+      * "/"       -> index page (optional; set serve_index=False when new UI serves /)
       * "/generate" -> ACE-Step generation endpoint
     """
     bp = Blueprint("cdmf_generation", __name__)
@@ -99,8 +100,7 @@ def create_generation_blueprint(
         ui_defaults.get("instrumental_gain_db", 0.0)
     )
 
-    @bp.route("/", methods=["GET"])
-    def index():
+    def _index_view():
         cdmf_state.reset_progress()
 
         tracks = cdmf_tracks.list_music_files()
@@ -157,6 +157,9 @@ def create_generation_blueprint(
             lora_adapters=cdmf_tracks.list_lora_adapters(),
             lora_name_or_path="",
         )
+
+    if serve_index:
+        bp.add_url_rule("/", "index", _index_view, methods=["GET"])
 
     @bp.route("/generate", methods=["POST"])
     def generate():

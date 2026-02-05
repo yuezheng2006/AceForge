@@ -43,7 +43,14 @@ jobs:
         
     - name: Display Python version
       run: python --version
-      
+
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    - name: Build new UI (React SPA) with Bun
+      run: ./scripts/build_ui.sh
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip

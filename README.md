@@ -166,6 +166,10 @@ MuFun-ACEStep can auto-generate `_prompt.txt` and `_lyrics.txt` files from audio
 - The model is large (tens of GB)
 - Outputs aren’t perfect—skim and correct weird tags/lyrics before training
 
+## Experimental: ace-step-ui integration
+
+On branch **`experimental-ui`** we explore swapping the built-in UI with [ace-step-ui](https://github.com/fspecii/ace-step-ui) (React + Spotify-like interface) while keeping our ACE-Step pipeline and adding Voice Cloning, Stem Splitting, etc. See **`docs/EXPERIMENTAL_UI_EXPLORATION.md`** for architecture and API contract. **`docs/NEW_UI_IMPLEMENTATION_PLAN.md`** is the implementation plan: port UI in-tree, add Flask API compatibility, and integrate UI build into local/PyInstaller builds. Target remains macOS Apple Silicon, standalone app.
+
 ## Troubleshooting
 
 ### Common Issues

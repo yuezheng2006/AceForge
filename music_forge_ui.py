@@ -22,7 +22,7 @@ from io import StringIO
 if 'PYTORCH_MPS_HIGH_WATERMARK_RATIO' not in os.environ:
     os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
 
-from flask import Flask, Response, request
+from flask import Flask, Response, request, send_from_directory
 
 # ---------------------------------------------------------------------------
 # Early module imports for frozen app compatibility
@@ -150,7 +150,7 @@ except Exception as _e:
 # Demucs stem splitting uses torch.hub for model download; cache must be writable.
 # ---------------------------------------------------------------------------
 import cdmf_paths
-from cdmf_paths import APP_VERSION
+from cdmf_paths import APP_VERSION, DEFAULT_OUT_DIR, get_user_data_dir
 os.environ.setdefault("TORCH_HOME", str(cdmf_paths.get_models_folder()))
 
 # ---------------------------------------------------------------------------
@@ -361,6 +361,87 @@ UI_DEFAULTS = {
 # Initialize model status before first page render
 cdmf_state.init_model_status()
 
+# New UI (React SPA) build output; when present we serve it at / and skip legacy index
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    _UI_DIST = Path(sys._MEIPASS) / "ui" / "dist"
+else:
+    _UI_DIST = Path(__file__).resolve().parent / "ui" / "dist"
+_USE_NEW_UI = _UI_DIST.is_dir()
+
+# ---------------------------------------------------------------------------
+# New UI API (ace-step-ui compatibility). Register first so / can be overridden later by new UI SPA.
+# ---------------------------------------------------------------------------
+try:
+    from api import (
+        auth_bp,
+        songs_bp,
+        generate_bp,
+        playlists_bp,
+        users_bp,
+        contact_bp,
+        reference_tracks_bp,
+        search_bp,
+    )
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(songs_bp, url_prefix="/api/songs")
+    app.register_blueprint(generate_bp, url_prefix="/api/generate")
+    app.register_blueprint(playlists_bp, url_prefix="/api/playlists")
+    app.register_blueprint(users_bp, url_prefix="/api/users")
+    app.register_blueprint(contact_bp, url_prefix="/api/contact")
+    app.register_blueprint(reference_tracks_bp, url_prefix="/api/reference-tracks")
+    app.register_blueprint(search_bp, url_prefix="/api/search")
+except ImportError as e:
+    print(f"[AceForge] New UI API not available: {e}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Global error handler: log 500s to app console and return JSON for /api/*
+# ---------------------------------------------------------------------------
+def _log_exception_and_return_response(error, status_code=500):
+    """Log full traceback to root logger (so it appears in app console), then return response."""
+    import traceback
+    tb = traceback.format_exc()
+    logging.getLogger().error("[AceForge] Server error (%s):\n%s", status_code, tb)
+    try:
+        path = request.path if request else ""
+    except Exception:
+        path = ""
+    if path.startswith("/api/"):
+        last_line = [l.strip() for l in tb.strip().split("\n") if l.strip()][-1] if tb else None
+        return {"error": str(error), "detail": last_line}, status_code
+    return None  # Let Flask use default HTML error page for non-API
+
+
+@app.errorhandler(500)
+def handle_500(error):
+    resp = _log_exception_and_return_response(error, 500)
+    if resp is not None:
+        from flask import jsonify
+        return jsonify(resp[0]), resp[1]
+    raise error
+
+
+@app.route("/audio/<path:filename>")
+def serve_audio(filename: str):
+    """Serve generated tracks and reference audio. /audio/<name> -> DEFAULT_OUT_DIR; /audio/refs/<name> -> references dir."""
+    if ".." in filename or filename.startswith("/"):
+        return Response("Invalid path", status=400, mimetype="text/plain")
+    if filename.startswith("refs/"):
+        ref_name = filename[5:].lstrip("/")
+        if not ref_name:
+            return Response("Invalid path", status=400, mimetype="text/plain")
+        directory = get_user_data_dir() / "references"
+        path = directory / ref_name
+        if not path.is_file():
+            return Response("Not found", status=404, mimetype="text/plain")
+        return send_from_directory(directory, ref_name)
+    directory = Path(DEFAULT_OUT_DIR)
+    path = directory / filename
+    if not path.is_file():
+        return Response("Not found", status=404, mimetype="text/plain")
+    return send_from_directory(directory, filename)
+
+
 # Register blueprints (no URL prefixes; routes match original paths)
 app.register_blueprint(create_tracks_blueprint())
 app.register_blueprint(create_models_blueprint())
@@ -371,6 +452,7 @@ app.register_blueprint(
         html_template=HTML,
         ui_defaults=UI_DEFAULTS,
         generate_track_ace=generate_track_ace,
+        serve_index=not _USE_NEW_UI,
     )
 )
 app.register_blueprint(create_lyrics_blueprint())
@@ -397,8 +479,6 @@ try:
 except (ImportError, Exception) as e:
     # MIDI generation is optional - if basic-pitch library is not installed, skip it
     print(f"[AceForge] MIDI generation not available: {e}", flush=True)
-
-
 
 # ---------------------------------------------------------------------------
 # Health + loading routes (simple, kept local)
@@ -489,6 +569,45 @@ def shutdown_server():
     except Exception as e:
         logging.error(f"[AceForge] Shutdown error: {e}")
         return {"status": "error", "message": str(e)}, 500
+
+
+# ---------------------------------------------------------------------------
+# New UI SPA: serve React app at / when ui/dist exists (registered last for catch-all)
+# ---------------------------------------------------------------------------
+if _USE_NEW_UI:
+    _NEW_UI_RESERVED = (
+        "api/",
+        "healthz",
+        "loading",
+        "logs",
+        "shutdown",
+        "audio/",
+        "music/",
+        "tracks",
+        "progress",
+        "user_presets",
+    )
+
+    def _send_new_ui_index():
+        return send_from_directory(str(_UI_DIST), "index.html")
+
+    @app.route("/")
+    def new_ui_index():
+        return _send_new_ui_index()
+
+    @app.route("/assets/<path:filename>")
+    def new_ui_assets(filename: str):
+        assets_dir = _UI_DIST / "assets"
+        if not assets_dir.is_dir():
+            return Response("Not found", status=404, mimetype="text/plain")
+        return send_from_directory(str(assets_dir), filename)
+
+    @app.route("/<path:path>")
+    def new_ui_spa_fallback(path: str):
+        for prefix in _NEW_UI_RESERVED:
+            if path == prefix or path.startswith(prefix + "/"):
+                return Response("Not found", status=404, mimetype="text/plain")
+        return _send_new_ui_index()
 
 
 # ---------------------------------------------------------------------------

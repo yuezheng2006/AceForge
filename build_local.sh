@@ -1,7 +1,8 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
 #  AceForge - Local Build Script
-#  Builds the PyInstaller app bundle for local testing
+#  Builds the PyInstaller app bundle for local testing.
+#  Includes the new React UI (ui/) when present; requires Bun (https://bun.sh).
 # ---------------------------------------------------------------------------
 
 set -e  # Exit on error
@@ -14,6 +15,24 @@ echo ""
 # App root = folder this script lives in
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
+
+# ---------------------------------------------------------------------------
+# Always build new UI (React/Vite) with Bun when ui/ exists; required for full app.
+# ---------------------------------------------------------------------------
+UI_DIR="${APP_DIR}/ui"
+if [ -f "$UI_DIR/package.json" ]; then
+    if ! command -v bun &> /dev/null; then
+        echo "ERROR: Bun is required to build the new UI. Install from https://bun.sh"
+        exit 1
+    fi
+    echo "[Build] Building new UI (React SPA) with Bun..."
+    "${APP_DIR}/scripts/build_ui.sh"
+    echo "[Build] New UI build OK"
+else
+    echo "ERROR: ui/package.json not found. The new UI source is required for the full app build."
+    exit 1
+fi
+echo ""
 
 # Check Python version
 PYTHON_CMD=""
@@ -134,7 +153,8 @@ echo "[Build] Final check: removing Japanese Sudachi packages (if present)..."
 
 # Clean previous builds (PyInstaller outputs only).
 # NEVER delete build/macos/ — it contains AceForge.icns (app icon), codesign.sh, pyinstaller hooks.
-echo "[Build] Cleaning previous builds..."
+# NEVER delete ui/dist/ — may have been produced by the new UI build above.
+echo "[Build] Cleaning previous PyInstaller builds..."
 rm -rf dist/AceForge.app dist/CDMF build/AceForge
 
 # Safeguard: build/macos must exist for the app icon and code signing
@@ -223,4 +243,6 @@ echo "     open \"$BUNDLED_APP\""
 echo ""
 echo "  3. Or run directly:"
 echo "     \"$BUNDLED_BIN\""
+echo ""
+echo "  ✓ New React UI is bundled; app will serve it at / when launched."
 echo ""
