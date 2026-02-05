@@ -974,7 +974,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500 px-3 pb-2">Applies when not in Instrumental mode</p>
             </div>
 
-            {/* Audio (optional) */}
+            {/* Audio */}
             <div
               onDrop={(e) => handleDrop(e, audioTab)}
               onDragOver={handleDragOver}
@@ -984,7 +984,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="px-3 py-2.5 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/[0.02]">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Audio (optional)</span>
+                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Audio</span>
                     {referenceAudioUrl && (
                       <p className="text-[11px] text-pink-600 dark:text-pink-400 mt-0.5 truncate" title={referenceAudioUrl}>
                         Reference: {getAudioLabel(referenceAudioUrl)}
