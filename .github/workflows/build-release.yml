@@ -74,6 +74,20 @@ jobs:
         pip install "coqpit" "trainer>=0.0.32" "pysbd>=0.3.4" "inflect>=5.6.0" "unidecode>=1.3.2"
         pip install "TTS==0.21.2"
         python -c "from TTS.api import TTS" || (echo "::error::TTS import failed. Voice cloning will not work." && exit 1)
+
+    - name: Install Demucs for stem splitting
+      run: |
+        pip install "demucs==4.0.1"
+        python -c "import demucs.separate" || (echo "::warning::Demucs import failed. Stem splitting may not work." && true)
+
+    - name: Install basic-pitch for MIDI generation
+      run: |
+        pip install "basic-pitch>=0.4.0"
+        python -c "from basic_pitch.inference import predict" || (echo "::warning::basic-pitch import failed. MIDI generation may not work." && true)
+
+    - name: Slim bundle (remove Sudachi if present)
+      run: |
+        pip uninstall -y SudachiDict-core SudachiPy sudachidict-core sudachipy 2>/dev/null || true
         
     - name: Install PyInstaller
       run: |
@@ -157,4 +171,5 @@ jobs:
       with:
         files: |
           AceForge-macOS.dmg
+          AceForge-macOS.zip
           checksums.txt
