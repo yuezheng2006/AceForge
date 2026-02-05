@@ -428,7 +428,7 @@ def main():
     # Create pywebview window pointing to Flask server
     # The singleton wrapper ensures this can only be called once
     window = webview.create_window(
-        title="AceForge - AI Music Generation",
+        title="AceForge",
         url=SERVER_URL,
         width=1400,
         height=900,

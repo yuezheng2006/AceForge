@@ -187,7 +187,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                         </div>
                         <div className="pl-7 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
                             <p>Version 1.0.0</p>
-                            <p>AceForge - AI Music Workstation</p>
+                            <p>AceForge</p>
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
                                 Powered by ACE-Step 1.5. Open source and free to use.
                             </p>

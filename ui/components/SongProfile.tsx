@@ -60,7 +60,7 @@ const updateMetaTags = (song: Song) => {
 };
 
 const resetMetaTags = () => {
-    document.title = 'AceForge - AI Music Workstation';
+    document.title = 'AceForge';
     const defaultDescription = 'Create and produce original music with AI locally. AceForge is a full AI music workstation—generate, stem-split, clone voices, and more.';
     const defaultImage = '/og-image.png';
 
@@ -70,11 +70,11 @@ const resetMetaTags = () => {
     };
 
     updateMeta('meta[name="description"]', defaultDescription);
-    updateMeta('meta[property="og:title"]', 'AceForge - AI Music Workstation');
+    updateMeta('meta[property="og:title"]', 'AceForge');
     updateMeta('meta[property="og:description"]', defaultDescription);
     updateMeta('meta[property="og:image"]', defaultImage);
     updateMeta('meta[property="og:type"]', 'website');
-    updateMeta('meta[name="twitter:title"]', 'AceForge - AI Music Workstation');
+    updateMeta('meta[name="twitter:title"]', 'AceForge');
     updateMeta('meta[name="twitter:description"]', defaultDescription);
     updateMeta('meta[name="twitter:image"]', defaultImage);
 };

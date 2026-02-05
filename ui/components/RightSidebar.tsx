@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
 import { Heart, Share2, Play, Pause, MoreHorizontal, X, Copy, Wand2, MoreVertical, Download, Repeat, Video, Music, Link as LinkIcon, Sparkles, Globe, Lock, Trash2, Edit3, Layers } from 'lucide-react';
 import { songsApi } from '../services/api';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, LOCAL_TOKEN } from '../context/AuthContext';
 import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
@@ -68,10 +68,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
 
     const saveTitleEdit = async () => {
         if (!song) return;
-        if (!token) {
-            setTitleError('Please sign in to rename.');
-            return;
-        }
         const trimmed = titleDraft.trim();
         if (!trimmed) {
             setTitleError('Title cannot be empty.');
@@ -84,7 +80,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
         setIsSavingTitle(true);
         setTitleError(null);
         try {
-            await songsApi.updateSong(song.id, { title: trimmed }, token);
+            await songsApi.updateSong(song.id, { title: trimmed }, token ?? LOCAL_TOKEN);
             onSongUpdate?.({ ...song, title: trimmed });
             setIsEditingTitle(false);
         } catch (err) {

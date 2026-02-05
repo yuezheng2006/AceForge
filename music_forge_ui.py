@@ -846,7 +846,7 @@ def main() -> None:
             
             # Create window with native macOS styling
             window = webview.create_window(
-                title="AceForge - AI Music Generation",
+                title="AceForge",
                 url=window_url,
                 width=1400,
                 height=900,
