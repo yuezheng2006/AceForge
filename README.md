@@ -6,7 +6,7 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 > Status: **ALPHA**
 
-<img width="779" height="588" alt="image" src="https://github.com/user-attachments/assets/bd520fcb-7c79-450e-8613-6e30a252a8ca" />
+<img width="700" alt="AceForge-UI" src="https://github.com/user-attachments/assets/e987b9fe-dee7-43a4-9371-9608baad6a20" />
 
 
 ## Features
@@ -28,18 +28,16 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 
 ### Minimum
 
-- macOS 12.0 (Monterey) or later
-- Apple Silicon (M1/M2/M3) or Intel Mac with AMD GPU
+- Apple Silicon (M1/M2/M3)
 - 16 GB unified memory (for Apple Silicon) or 16 GB RAM
-- ~10–12 GB VRAM/unified memory (more = more headroom)
+- ~8–16 GB VRAM/unified memory (more = more headroom)
 - SSD with tens of GB free (models + audio + datasets)
 
 ### Recommended
 
-- Apple Silicon M1 Pro/Max/Ultra, M2 Pro/Max/Ultra, or M3 Pro/Max
+- Apple Silicon M4 Pro or M3 Pro/Max
 - 32 GB+ unified memory
 - Fast SSD
-- Comfort reading terminal logs when something goes wrong
 
 ## Install and run
 
@@ -202,5 +200,6 @@ Issues and PRs welcome. If you’re changing anything related to training, model
 
 ## License
 
-This project’s **source code** is licensed under the **Apache License 2.0**. See `LICENSE`.
+AceForge is licensed under the **Apache License 2.0**. See `LICENSE`.
 
+THe UI is forked and extended from [Ace-Step UI](https://github.com/fspecii/ace-step-ui) (MIT)

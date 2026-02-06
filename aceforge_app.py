@@ -105,6 +105,19 @@ try:
 except Exception as e:
     print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
 
+# When frozen and launched with --train, run the LoRA trainer in this process and exit (no GUI).
+# This allows Training to work from the app bundle; the parent app spawns us with --train + args.
+# For --train --help we only load the parser (no heavy deps) so the bundle test can pass.
+if getattr(sys, "frozen", False) and "--train" in sys.argv:
+    sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:] if a != "--train"]
+    if "--help" in sys.argv or "-h" in sys.argv:
+        from cdmf_trainer_parser import _make_parser
+        _make_parser().print_help()
+        sys.exit(0)
+    from cdmf_trainer import run_from_argv
+    run_from_argv()
+    sys.exit(0)
+
 # Import pywebview FIRST and patch it BEFORE importing music_forge_ui
 # This ensures that even if music_forge_ui tries to use webview, it will be protected
 import webview
@@ -428,7 +441,7 @@ def main():
     # Create pywebview window pointing to Flask server
     # The singleton wrapper ensures this can only be called once
     window = webview.create_window(
-        title="AceForge - AI Music Generation",
+        title="AceForge",
         url=SERVER_URL,
         width=1400,
         height=900,
@@ -458,9 +471,31 @@ def main():
     import atexit
     atexit.register(cleanup_resources)
     
+    # Apply zoom from preferences (default 80%); takes effect on next launch if changed in Settings
+    try:
+        from cdmf_paths import load_config
+        _cfg = load_config()
+        _z = int(_cfg.get("ui_zoom") or 80)
+        _z = max(50, min(150, _z))
+    except Exception:
+        _z = 80
+    _WEBVIEW_ZOOM = f"{_z}%"
+    _WEBVIEW_ZOOM_JS = f'document.documentElement.style.zoom = "{_WEBVIEW_ZOOM}";'
+    
+    def _apply_webview_zoom(win):
+        time.sleep(1.8)  # allow initial page load
+        try:
+            if hasattr(win, 'run_js'):
+                win.run_js(_WEBVIEW_ZOOM_JS)
+            else:
+                win.evaluate_js(_WEBVIEW_ZOOM_JS)
+            print(f"[AceForge] Webview zoom set to {_WEBVIEW_ZOOM}", flush=True)
+        except Exception as e:
+            print(f"[AceForge] Could not set webview zoom: {e}", flush=True)
+    
     # Start the GUI event loop (only once - this is a blocking call)
-    # The singleton wrapper ensures this can only be called once globally
-    webview.start(debug=False)
+    # Pass _apply_webview_zoom so it runs in a separate thread after window is ready
+    webview.start(_apply_webview_zoom, window, debug=False)
     
     # This should not be reached (on_window_closed exits), but just in case
     cleanup_resources()

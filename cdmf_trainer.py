@@ -31,6 +31,7 @@ from tqdm import tqdm
 import random
 import os
 from cdmf_pipeline_ace_step import ACEStepPipeline
+from cdmf_paths import CUSTOM_LORA_ROOT
 
 matplotlib.use("Agg")
 # Configure CUDA backends if available
@@ -1021,9 +1022,8 @@ class Pipeline(LightningModule):
             run_ckpt_dir, adapter_name=self.adapter_name
         )
 
-        # Stable copy under <APP_DIR>/custom_lora/<adapter_name>
-        app_dir = Path(__file__).resolve().parent
-        custom_root = app_dir / "custom_lora" / self.adapter_name
+        # Stable copy under CUSTOM_LORA_ROOT (same as list_lora_adapters; macOS = user data dir)
+        custom_root = CUSTOM_LORA_ROOT / self.adapter_name
         os.makedirs(custom_root, exist_ok=True)
         self.transformers.save_lora_adapter(
             str(custom_root), adapter_name=self.adapter_name
@@ -1352,46 +1352,15 @@ def main(args):
     )
 
 
+def run_from_argv():
+    """Parse sys.argv and run training. Used when the frozen app is launched with --train."""
+    from cdmf_trainer_parser import _make_parser
+    parser = _make_parser()
+    args = parser.parse_args()
+    main(args)
+
+
 if __name__ == "__main__":
-    args = argparse.ArgumentParser()
-    args.add_argument("--num_nodes", type=int, default=1)
-    args.add_argument("--shift", type=float, default=3.0)
-    args.add_argument("--learning_rate", type=float, default=1e-4)
-    args.add_argument("--num_workers", type=int, default=8)
-
-    # Stop training by epochs by default; this is what we’ll expose in the UI
-    args.add_argument("--epochs", type=int, default=20)
-
-    # By default, do NOT stop by max_steps (Lightning treats -1 as "no step limit")
-    args.add_argument("--max_steps", type=int, default=-1)
-
-    args.add_argument("--every_n_train_steps", type=int, default=50)
-    args.add_argument("--dataset_path", type=str, default="./zh_lora_dataset")
-    args.add_argument("--exp_name", type=str, default="chinese_rap_lora")
-    args.add_argument("--precision", type=str, default="32")
-    args.add_argument("--accumulate_grad_batches", type=int, default=1)
-    args.add_argument("--devices", type=int, default=1)
-    args.add_argument("--logger_dir", type=str, default="./exps/logs/")
-    args.add_argument("--ckpt_path", type=str, default=None)
-    args.add_argument("--checkpoint_dir", type=str, default=None)
-    args.add_argument("--gradient_clip_val", type=float, default=0.5)
-    args.add_argument("--gradient_clip_algorithm", type=str, default="norm")
-    args.add_argument("--reload_dataloaders_every_n_epochs", type=int, default=1)
-    args.add_argument("--every_plot_step", type=int, default=2000)
-    args.add_argument("--val_check_interval", type=int, default=None)
-    args.add_argument("--lora_config_path", type=str, default="config/zh_rap_lora_config.json")
-
-    # New knobs
-    args.add_argument("--ssl_coeff", type=float, default=1.0)
-    args.add_argument("--max_audio_seconds", type=float, default=60.0)
-    args.add_argument(
-        "--instrumental_only",
-        action="store_true",
-        help=(
-            "Treat dataset as instrumental / no vocals. "
-            "LoRA layers attached to lyric and speaker-specific blocks will be frozen."
-        ),
-    )
-
-    args = args.parse_args()
+    from cdmf_trainer_parser import _make_parser
+    args = _make_parser().parse_args()
     main(args)

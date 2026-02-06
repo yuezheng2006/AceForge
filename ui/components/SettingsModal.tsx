@@ -1,0 +1,337 @@
+import React, { useState, useEffect } from 'react';
+import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { EditProfileModal } from './EditProfileModal';
+import { preferencesApi } from '../services/api';
+
+interface SettingsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
+    onNavigateToProfile?: (username: string) => void;
+}
+
+const ZOOM_OPTIONS = [80, 90, 100, 110, 125] as const;
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
+    const { user } = useAuth();
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [modelsFolder, setModelsFolder] = useState('');
+    const [modelsFolderSaved, setModelsFolderSaved] = useState(false);
+    const [outputDir, setOutputDir] = useState('');
+    const [outputDirSaved, setOutputDirSaved] = useState(false);
+    const [uiZoom, setUiZoom] = useState(80);
+    const [uiZoomSaved, setUiZoomSaved] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            preferencesApi.get()
+                .then((prefs) => {
+                    setOutputDir(prefs.output_dir ?? '');
+                    setModelsFolder(prefs.models_folder ?? '');
+                    const z = prefs.ui_zoom ?? 80;
+                    setUiZoom(ZOOM_OPTIONS.includes(z as typeof ZOOM_OPTIONS[number]) ? (z as number) : 80);
+                })
+                .catch(() => {});
+        }
+    }, [isOpen]);
+
+    const saveOutputDir = () => {
+        preferencesApi.update({ output_dir: outputDir.trim() || undefined })
+            .then(() => { setOutputDirSaved(true); setTimeout(() => setOutputDirSaved(false), 2000); })
+            .catch(() => {});
+    };
+
+    const saveModelsFolder = () => {
+        preferencesApi.update({ models_folder: modelsFolder.trim() || undefined })
+            .then(() => { setModelsFolderSaved(true); setTimeout(() => setModelsFolderSaved(false), 2000); })
+            .catch(() => {});
+    };
+
+    if (!isOpen || !user) {
+        if (isEditProfileOpen && user) {
+            return (
+                <EditProfileModal
+                    isOpen={isEditProfileOpen}
+                    onClose={() => setIsEditProfileOpen(false)}
+                    onSaved={() => setIsEditProfileOpen(false)}
+                />
+            );
+        }
+        return null;
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div
+                className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-white/5">
+                    <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Settings</h2>
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-full transition-colors"
+                    >
+                        <X size={20} className="text-zinc-500" />
+                    </button>
+                </div>
+
+                <div className="p-6 space-y-8">
+                    {/* AceForge paths (models, output) */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <HardDrive size={20} />
+                            <h3 className="font-semibold">Paths</h3>
+                        </div>
+                        <div className="pl-7 space-y-4">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Models folder</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where ACE-Step and other models are stored. Leave blank for app default. Change takes effect immediately.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={modelsFolder}
+                                        onChange={(e) => setModelsFolder(e.target.value)}
+                                        onBlur={saveModelsFolder}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveModelsFolder}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {modelsFolderSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={outputDir}
+                                        onChange={(e) => setOutputDir(e.target.value)}
+                                        onBlur={saveOutputDir}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveOutputDir}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {outputDirSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Display / Zoom */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <ZoomIn size={20} />
+                            <h3 className="font-semibold">Display</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">UI zoom</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Window zoom level. Takes effect on next app launch.</p>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    {ZOOM_OPTIONS.map((pct) => (
+                                        <button
+                                            key={pct}
+                                            type="button"
+                                            onClick={() => {
+                                                setUiZoom(pct);
+                                                preferencesApi.update({ ui_zoom: pct })
+                                                    .then(() => { setUiZoomSaved(true); setTimeout(() => setUiZoomSaved(false), 2000); })
+                                                    .catch(() => {});
+                                            }}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${uiZoom === pct
+                                                ? 'bg-pink-500 text-white'
+                                                : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600'
+                                            }`}
+                                        >
+                                            {pct}%
+                                        </button>
+                                    ))}
+                                    {uiZoomSaved && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* User Profile Section */}
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-2xl font-bold text-white shadow-lg overflow-hidden">
+                                {user.avatar_url ? (
+                                    <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
+                                ) : (
+                                    user.username[0].toUpperCase()
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">@{user.username}</h3>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+                                    Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        setIsEditProfileOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                                >
+                                    <Edit3 size={16} />
+                                    Edit Profile
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onClose();
+                                        onNavigateToProfile?.(user.username);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                                >
+                                    <ExternalLink size={16} />
+                                    View Profile
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Account Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <UserIcon size={20} />
+                            <h3 className="font-semibold">Account</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400">Username</label>
+                                <p className="text-zinc-900 dark:text-white font-medium">@{user.username}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Output directory (global for generation, stems, voice clone, MIDI) */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <FolderOpen size={20} />
+                            <h3 className="font-semibold">Output</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Output directory</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">Where generated tracks, stems, voice clones, and MIDI are saved. Leave blank for app default.</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={outputDir}
+                                        onChange={(e) => setOutputDir(e.target.value)}
+                                        onBlur={saveOutputDir}
+                                        placeholder="Default (app data folder)"
+                                        className="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={saveOutputDir}
+                                        className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600"
+                                    >
+                                        {outputDirSaved ? 'Saved' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Theme Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <Palette size={20} />
+                            <h3 className="font-semibold">Appearance</h3>
+                        </div>
+                        <div className="pl-7 space-y-3">
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={theme === 'dark' ? onToggleTheme : undefined}
+                                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${theme === 'light'
+                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                            : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
+                                        }`}
+                                >
+                                    Light
+                                </button>
+                                <button
+                                    onClick={theme === 'light' ? onToggleTheme : undefined}
+                                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-colors ${theme === 'dark'
+                                            ? 'border-indigo-500 bg-indigo-950 text-indigo-300'
+                                            : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
+                                        }`}
+                                >
+                                    Dark
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* About Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <Info size={20} />
+                            <h3 className="font-semibold">About</h3>
+                        </div>
+                        <div className="pl-7 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+                            <p>Version 1.0.0</p>
+                            <p>AceForge</p>
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-2">
+                                Powered by ACE-Step 1.5. Open source and free to use.
+                            </p>
+                            <div className="pt-3 border-t border-zinc-200 dark:border-zinc-700/50 mt-4">
+                                <p className="text-zinc-900 dark:text-white font-medium mb-3">AceForge</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <a
+                                        href="https://github.com/audiohacking/AceForge"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 dark:bg-zinc-700 text-white rounded-lg text-sm font-medium hover:bg-zinc-700 dark:hover:bg-zinc-600 transition-colors"
+                                    >
+                                        <Github size={16} />
+                                        GitHub Repo
+                                    </a>
+                                </div>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-3">
+                                    Report issues or request features on GitHub
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t border-zinc-200 dark:border-white/5 p-6 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-semibold rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+
+            <EditProfileModal
+                isOpen={isEditProfileOpen}
+                onClose={() => setIsEditProfileOpen(false)}
+                onSaved={() => setIsEditProfileOpen(false)}
+            />
+        </div>
+    );
+};

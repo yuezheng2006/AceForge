@@ -319,15 +319,15 @@ class StemSplitter:
         logger.info(f"Splitting audio: {input_path.name} -> {stem_count} stems using {model}")
         
         # Prepare arguments for demucs.separate.main
-        # Demucs CLI: demucs.separate.main(["-n", model, "-o", output_dir, input_file])
+        # Demucs CLI supports --device (mps, cuda, cpu) for GPU acceleration on Apple Silicon / NVIDIA
         args = ["-n", model, "-o", str(output_path), str(input_path)]
+        # Explicit device so Demucs uses MPS on Apple Silicon (faster than CPU)
+        device_arg = self.device.type if self.device.type in ("mps", "cuda", "cpu") else "cpu"
+        args.extend(["--device", device_arg])
         
         # Add two-stems option for 2-stem mode
         if stem_count == 2:
             args.append("--two-stems=vocals")
-        
-        # Set device preference via environment (Demucs respects CUDA_VISIBLE_DEVICES, etc.)
-        # For MPS, we'll let PyTorch handle it automatically
         
         try:
             import demucs.separate
@@ -335,19 +335,11 @@ class StemSplitter:
             # Patch Demucs's tqdm to report progress
             self._patch_demucs_tqdm()
             
-            # Demucs will use the device based on PyTorch's default
-            # We can't directly pass device to demucs.separate.main, but
-            # we can set torch's default device before calling
-            try:
-                if self.device.type == "mps":
-                    # MPS is already set as default via torch.device("mps")
-                    # Demucs should pick it up automatically
-                    pass
-                elif self.device.type == "cuda":
-                    # Set CUDA device
+            if self.device.type == "cuda":
+                try:
                     torch.cuda.set_device(self.device)
-            except Exception as e:
-                logger.warning(f"Could not set device preference: {e}")
+                except Exception as e:
+                    logger.warning(f"Could not set CUDA device: {e}")
             
             # Report start
             _report_stem_split_progress(0.05, "stem_split_load")

@@ -26,7 +26,7 @@ if "PYTORCH_JIT" not in os.environ:
 
 import torch
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, Callable
 import logging
 
 logger = logging.getLogger(__name__)
@@ -284,3 +284,27 @@ def get_voice_cloner() -> VoiceCloner:
     if _voice_cloner is None:
         _voice_cloner = VoiceCloner()
     return _voice_cloner
+
+
+def voice_clone_models_present() -> bool:
+    """Return True if the TTS/XTTS model is already loaded (initialized)."""
+    global _voice_cloner
+    return _voice_cloner is not None and getattr(_voice_cloner, "_initialized", False)
+
+
+def ensure_voice_clone_models(device_preference: str = "auto", progress_cb: Optional[Callable[[float], None]] = None) -> None:
+    """
+    Pre-download and load the TTS/XTTS model in the current process.
+    progress_cb(fraction) is called with 0.0 at start and 1.0 when done (TTS does not expose download progress).
+    """
+    if progress_cb:
+        try:
+            progress_cb(0.0)
+        except Exception:
+            pass
+    get_voice_cloner()._initialize(device_preference=device_preference)
+    if progress_cb:
+        try:
+            progress_cb(1.0)
+        except Exception:
+            pass

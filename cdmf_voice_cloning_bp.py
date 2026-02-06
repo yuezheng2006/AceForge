@@ -13,7 +13,7 @@ from flask import Blueprint, request, render_template_string, jsonify
 from werkzeug.utils import secure_filename
 
 import cdmf_tracks
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION, get_next_available_output_path
+from cdmf_paths import APP_VERSION, get_output_dir, get_next_available_output_path
 from cdmf_voice_cloning import get_voice_cloner
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                 output_filename += ".mp3"
             
             # Get output directory (same as music generation)
-            out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
+            out_dir = request.form.get("out_dir") or get_output_dir()
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
             
@@ -165,6 +165,10 @@ def create_voice_cloning_blueprint(html_template: str) -> Blueprint:
                     entry["enable_text_splitting"] = enable_text_splitting
                     entry["device_preference"] = device_preference
                     entry["out_dir"] = str(out_dir_path)
+                    tags = list(entry.get("tags") or [])
+                    if "voice_cloning" not in tags:
+                        tags.append("voice_cloning")
+                    entry["tags"] = tags
                     track_meta[final_name] = entry
                     cdmf_tracks.save_track_meta(track_meta)
                 except Exception as e:

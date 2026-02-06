@@ -129,6 +129,20 @@ def _get_default_output_dir() -> Path:
 DEFAULT_OUT_DIR = str(_get_default_output_dir())
 
 
+def get_output_dir() -> str:
+    """Return configured global output directory, or default. Used when client does not send out_dir."""
+    config = load_config()
+    path = config.get("output_dir")
+    if path:
+        try:
+            p = Path(path).resolve()
+            p.mkdir(parents=True, exist_ok=True)
+            return str(p)
+        except Exception as e:
+            print(f"[AceForge] Invalid output_dir in config: {e}", flush=True)
+    return DEFAULT_OUT_DIR
+
+
 def get_next_available_output_path(out_dir: Path | str, base_stem: str, ext: str = ".wav") -> Path:
     """
     Return a path under out_dir for the given base name and extension that does not

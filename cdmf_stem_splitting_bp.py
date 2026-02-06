@@ -14,7 +14,7 @@ from werkzeug.utils import secure_filename
 
 import cdmf_tracks
 import cdmf_state
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION
+from cdmf_paths import APP_VERSION, get_output_dir
 from cdmf_stem_splitting import get_stem_splitter
 
 logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
                 export_format = "wav"
             
             # Get output directory (same as music generation)
-            out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
+            out_dir = request.form.get("out_dir") or get_output_dir()
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
             
@@ -137,50 +137,51 @@ def create_stem_splitting_blueprint(html_template: str) -> Blueprint:
                 except Exception as e:
                     logger.warning(f"Failed to clean up temp directory: {e}")
                 
-                # Save track metadata for Music Player
-                # Each stem gets its own metadata entry
-                try:
-                    from cdmf_ffmpeg import ensure_ffmpeg_in_path
-                    ensure_ffmpeg_in_path()
-                    
-                    from pydub import AudioSegment
-                    
-                    track_meta = cdmf_tracks.load_track_meta()
-                    
-                    for stem_name, stem_path in stem_files.items():
-                        stem_filename = Path(stem_path).name
+                # Save track metadata for Music Player so stems appear in library
+                # Each stem gets its own metadata entry; never fail the request if metadata has issues
+                track_meta = cdmf_tracks.load_track_meta()
+                base_filename_form = request.form.get("base_filename", "").strip()
+                for stem_name, stem_path in stem_files.items():
+                    stem_filename = Path(stem_path).name
+                    dur = 0.0
+                    try:
+                        from cdmf_ffmpeg import ensure_ffmpeg_in_path
+                        ensure_ffmpeg_in_path()
+                        from pydub import AudioSegment
                         dur = len(AudioSegment.from_file(str(stem_path))) / 1000.0
-                        
-                        entry = track_meta.get(stem_filename, {})
-                        if "favorite" not in entry:
-                            entry["favorite"] = False
-                        entry["seconds"] = dur
-                        entry["created"] = time.time()
-                        entry["generator"] = "stem"
-                        entry["basename"] = Path(stem_filename).stem
-                        # original_file already saved below
-                        entry["stem_name"] = stem_name
-                        entry["stem_count"] = stem_count
-                        entry["mode"] = mode or ""
-                        entry["export_format"] = export_format
-                        entry["device_preference"] = device_preference
-                        entry["out_dir"] = str(out_dir_path)
-                        entry["original_file"] = str(temp_input_path)
-                        entry["input_file"] = str(temp_input_path)  # Full path for consistency
-                        # Save base_filename if provided
-                        base_filename = request.form.get("base_filename", "").strip()
-                        if base_filename:
-                            entry["base_filename"] = base_filename
-                        track_meta[stem_filename] = entry
-                    
+                    except Exception as e:
+                        if stem_path and Path(stem_path).is_file():
+                            try:
+                                dur = cdmf_tracks.get_audio_duration(Path(stem_path))
+                            except Exception:
+                                pass
+                        logger.debug("[Stem Splitting] Duration for %s: %s (fallback used)", stem_filename, e)
+                    entry = track_meta.get(stem_filename, {})
+                    if "favorite" not in entry:
+                        entry["favorite"] = False
+                    entry["seconds"] = dur
+                    entry["created"] = time.time()
+                    entry["generator"] = "stem"
+                    entry["basename"] = Path(stem_filename).stem
+                    entry["stem_name"] = stem_name
+                    entry["stem_count"] = stem_count
+                    entry["mode"] = mode or ""
+                    entry["export_format"] = export_format
+                    entry["device_preference"] = device_preference
+                    entry["out_dir"] = str(out_dir_path)
+                    entry["original_file"] = str(temp_input_path)
+                    entry["input_file"] = str(temp_input_path)
+                    tags = list(entry.get("tags") or [])
+                    if "stems" not in tags:
+                        tags.append("stems")
+                    entry["tags"] = tags
+                    if base_filename_form:
+                        entry["base_filename"] = base_filename_form
+                    track_meta[stem_filename] = entry
+                try:
                     cdmf_tracks.save_track_meta(track_meta)
                 except Exception as e:
-                    from cdmf_ffmpeg import FFMPEG_INSTALL_HINT, is_ffmpeg_not_found_error
-                    
-                    if is_ffmpeg_not_found_error(e):
-                        logger.warning("[Stem Splitting] Failed to save track metadata: %s", FFMPEG_INSTALL_HINT)
-                    else:
-                        logger.warning("[Stem Splitting] Failed to save track metadata: %s", e)
+                    logger.warning("[Stem Splitting] Failed to save track metadata: %s", e)
                 
                 # Mark progress as done
                 with cdmf_state.PROGRESS_LOCK:

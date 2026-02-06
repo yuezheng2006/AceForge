@@ -13,7 +13,7 @@ from flask import Blueprint, request, render_template_string, jsonify
 from werkzeug.utils import secure_filename
 
 import cdmf_tracks
-from cdmf_paths import DEFAULT_OUT_DIR, APP_VERSION, get_next_available_output_path
+from cdmf_paths import APP_VERSION, get_output_dir, get_next_available_output_path
 from cdmf_midi_generation import get_midi_generator
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
                 stem = output_filename
             
             # Get output directory (same as music generation)
-            out_dir = request.form.get("out_dir", DEFAULT_OUT_DIR)
+            out_dir = request.form.get("out_dir") or get_output_dir()
             out_dir_path = Path(out_dir)
             out_dir_path.mkdir(parents=True, exist_ok=True)
             
@@ -173,6 +173,10 @@ def create_midi_generation_blueprint(html_template: str) -> Blueprint:
                     entry["out_dir"] = str(out_dir_path)
                     entry["original_file"] = str(temp_input_path)
                     entry["input_file"] = str(temp_input_path)  # Full path for consistency
+                    tags = list(entry.get("tags") or [])
+                    if "midi" not in tags:
+                        tags.append("midi")
+                    entry["tags"] = tags
                     track_meta[midi_filename] = entry
                     
                     cdmf_tracks.save_track_meta(track_meta)

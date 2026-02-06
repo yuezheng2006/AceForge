@@ -54,6 +54,10 @@ release/
 *.app
 *.spec.bak
 
+# ---- New UI (React/Vite) ----
+ui/node_modules/
+ui/dist/
+
 # ---- Minification / tooling caches ----
 node_modules/
 npm-debug.log*

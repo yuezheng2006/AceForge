@@ -533,6 +533,8 @@ def _prepare_reference_audio(
     Normalise the ACE-Step edit / audio2audio mode:
 
       - Task is clamped to one of: text2music / retake / repaint / extend.
+      - UI tasks "cover" and "audio2audio" are mapped to "retake" (ACE-Step
+        then uses ref_audio_input and sets task to "audio2audio" internally).
       - If Audio2Audio is enabled while task is still 'text2music', we
         internally flip it to 'retake' (this is how ACE-Step expects edits).
       - For any edit mode (retake/repaint/extend) we prefer to have a
@@ -541,8 +543,12 @@ def _prepare_reference_audio(
         text2music instead of throwing.
     """
     task_norm = (task or "text2music").strip().lower()
-    if task_norm not in ("text2music", "retake", "repaint", "extend"):
+    if task_norm not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio"):
         task_norm = "text2music"
+    # Map UI task names to pipeline task: cover and audio2audio both run as retake
+    # (pipeline will set task to "audio2audio" when ref_audio_input is passed).
+    if task_norm in ("cover", "audio2audio"):
+        task_norm = "retake"
 
     # Audio2Audio is effectively an edit of an existing clip. If the user
     # left the task on "Text → music", run it as a retake under the hood.
@@ -764,6 +770,7 @@ def _run_ace_text2music(
     ref_audio_strength: float = 0.7,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
+    cancel_check: Optional[Callable[[], bool]] = None,
 ) -> None:
     """
     Call ACE-Step Text2Music and render a single track into ``output_path``.
@@ -871,21 +878,27 @@ def _run_ace_text2music(
             "batch_size": 1,
             "save_path": str(output_path),
             "debug": False,
+            "shift": 6.0,
         }
+        if cancel_check is not None:
+            call_kwargs["cancel_check"] = cancel_check
 
-        # Wire up reference vs source audio correctly:
+        # Wire up reference vs source audio per ACE-Step pipeline:
         #
-        # - For audio2audio: send the clip as `ref_audio_input` and DO NOT
-        #   pass `src_audio_path`. ACE-Step will internally flip `task` to
-        #   "audio2audio", and older builds avoid the buggy assert.
-        #
-        # - For plain text2music: leave both unset (None).
-        if audio2audio_enable and src_audio_path:
-            call_kwargs["ref_audio_input"] = src_audio_path
-            # Important: never set a non-None src_audio_path for this mode.
-            call_kwargs["src_audio_path"] = None
-        else:
+        # - retake / cover / audio2audio: use ref_audio_input (pipeline sets task to
+        #   "audio2audio" and uses ref_latents). Do NOT pass src_audio_path.
+        # - repaint / extend: use src_audio_path (pipeline uses src_latents for the
+        #   segment to repaint or extend). Do NOT pass ref_audio_input for this path.
+        # - text2music: leave both unset (None).
+        if not src_audio_path:
             call_kwargs["ref_audio_input"] = None
+            call_kwargs["src_audio_path"] = None
+        elif task in ("repaint", "extend"):
+            call_kwargs["src_audio_path"] = src_audio_path
+            call_kwargs["ref_audio_input"] = None
+        else:
+            # retake (including cover/audio2audio from UI)
+            call_kwargs["ref_audio_input"] = src_audio_path
             call_kwargs["src_audio_path"] = None
 
         # Only forward LoRA configuration if an adapter path/name was provided.
@@ -1023,6 +1036,7 @@ def generate_track_ace(
     src_audio_path: str | None = None,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
+    cancel_check: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
     """
     High-level wrapper for the Flask UI.
@@ -1099,6 +1113,11 @@ def generate_track_ace(
         src_audio_path,
     )
 
+    # repaint_end < 0 means "end of audio" (see ACE-Step-INFERENCE.md); use target duration.
+    eff_repaint_end = float(repaint_end) if repaint_end is not None else 0.0
+    if eff_repaint_end < 0:
+        eff_repaint_end = requested_total
+
     out_path = _next_available_output_path(out_dir, basename, ext=".wav")
 
     print(
@@ -1139,13 +1158,14 @@ def generate_track_ace(
         oss_steps=oss_steps,
         task=task,
         repaint_start=float(repaint_start),
-        repaint_end=float(repaint_end),
+        repaint_end=eff_repaint_end,
         retake_variance=float(retake_variance),
         src_audio_path=src_audio_path,
         audio2audio_enable=bool(audio2audio_enable),
         ref_audio_strength=float(ref_audio_strength),
         lora_name_or_path=lora_name_or_path,
         lora_weight=float(lora_weight),
+        cancel_check=cancel_check,
     )
 
     _report_progress(0.90, "fades")

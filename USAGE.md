@@ -353,6 +353,20 @@ The **Advanced** tab exposes more ACE-Step internals:
   - Browse for a LoRA folder under `custom_lora`.
   - Set the LoRA weight (0–10).
 
+### 5.5 Cover and Audio→Audio: key parameters
+
+In **Cover** and **Audio→Audio** modes you transform an existing track. The following parameters directly control how much the output follows the **source audio** vs your **Style** and **Lyrics**:
+
+| Parameter | What it controls | Effect |
+|-----------|------------------|--------|
+| **Style of Music** (caption) | Target style for the output | Describes the *target* genre, mood, instruments. Strongly influences the result when Cover Strength is lower. |
+| **Lyrics** | Target lyrics for the output | The *target* lyric content and structure. Uncheck **Instrumental** to use them; otherwise the model gets an instrumental token. |
+| **Cover Strength** (Source influence) | Balance: source vs your text | **1.0** = output follows the source closely (structure + character). **Lower (e.g. 0.5–0.7)** = more influence from your Style and Lyrics. **0.2** = loose style transfer. |
+| **Instrumental** | Whether lyrics are used | When checked, lyrics are ignored and the model receives an instrumental token. Uncheck to apply your Lyrics. |
+| **Guidance scale** | How strongly the model follows text | Higher = stronger adherence to your Style/Lyrics (and to the source when combined with high Cover Strength). |
+
+**Summary:** For covers that reflect your own style and lyrics, set **Style** and **Lyrics** as desired, uncheck **Instrumental** if you use lyrics, and lower **Cover Strength** (e.g. 0.5–0.7) so your text has more influence. The (i) tooltips in the Create panel repeat this for quick reference.
+
 If you're new to ACE-Step, you can ignore the Advanced tab entirely. The defaults were
 chosen to be safe and high quality out of the box.
 

@@ -55,6 +55,11 @@ import json
 import math
 
 try:
+    from cdmf_generation_job import GenerationCancelled
+except ImportError:
+    GenerationCancelled = Exception  # fallback if module not available
+
+try:
     from huggingface_hub import snapshot_download
 except ImportError as e:
     _IMPORT_ERRORS['huggingface_hub'] = str(e)
@@ -921,6 +926,8 @@ class ACEStepPipeline:
         n_max=1.0,
         n_avg=1,
         scheduler_type="euler",
+        shift: float = 6.0,
+        cancel_check=None,
     ):
 
         do_classifier_free_guidance = True
@@ -932,7 +939,7 @@ class ACEStepPipeline:
 
         scheduler = FlowMatchEulerDiscreteScheduler(
             num_train_timesteps=1000,
-            shift=3.0,
+            shift=shift,
         )
 
         T_steps = infer_steps
@@ -996,7 +1003,8 @@ class ACEStepPipeline:
         logger.info("flowedit start from {} to {}".format(n_min, n_max))
 
         for i, t in tqdm(enumerate(timesteps), total=T_steps):
-
+            if cancel_check and callable(cancel_check) and cancel_check():
+                raise GenerationCancelled()
             if i < n_min:
                 continue
 
@@ -1111,25 +1119,26 @@ class ACEStepPipeline:
         noise,
         scheduler_type,
         infer_steps,
+        shift: float = 6.0,
     ):
 
         bsz = gt_latents.shape[0]
         if scheduler_type == "euler":
             scheduler = FlowMatchEulerDiscreteScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
                 sigma_max=sigma_max,
             )
         elif scheduler_type == "heun":
             scheduler = FlowMatchHeunDiscreteScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
                 sigma_max=sigma_max,
             )
         elif scheduler_type == "pingpong":
             scheduler = FlowMatchPingPongScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
                 sigma_max=sigma_max
             )
 
@@ -1180,6 +1189,8 @@ class ACEStepPipeline:
         audio2audio_enable=False,
         ref_audio_strength=0.5,
         ref_latents=None,
+        shift: float = 6.0,
+        cancel_check=None,
     ):
 
         logger.info(
@@ -1212,17 +1223,17 @@ class ACEStepPipeline:
         if scheduler_type == "euler":
             scheduler = FlowMatchEulerDiscreteScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
             )
         elif scheduler_type == "heun":
             scheduler = FlowMatchHeunDiscreteScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
             )
         elif scheduler_type == "pingpong":
             scheduler = FlowMatchPingPongScheduler(
                 num_train_timesteps=1000,
-                shift=3.0,
+                shift=shift,
             )
 
         frame_length = int(duration * 44100 / 512 / 8)
@@ -1400,6 +1411,7 @@ class ACEStepPipeline:
                 noise=target_latents,
                 scheduler_type=scheduler_type,
                 infer_steps=infer_steps,
+                shift=shift,
             )
 
         attention_mask = torch.ones(bsz, frame_length, device=self.device, dtype=self.dtype)
@@ -1523,7 +1535,8 @@ class ACEStepPipeline:
             return sample
 
         for i, t in tqdm(enumerate(timesteps), total=num_inference_steps):
-
+            if cancel_check and callable(cancel_check) and cancel_check():
+                raise GenerationCancelled()
             if is_repaint:
                 if i < n_min:
                     continue
@@ -1876,6 +1889,8 @@ class ACEStepPipeline:
         save_path: str = None,
         batch_size: int = 1,
         debug: bool = False,
+        shift: float = 6.0,
+        cancel_check=None,
     ):
 
         start_time = time.time()
@@ -2029,6 +2044,8 @@ class ACEStepPipeline:
                 n_max=edit_n_max,
                 n_avg=edit_n_avg,
                 scheduler_type=scheduler_type,
+                shift=shift,
+                cancel_check=cancel_check,
             )
         else:
             target_latents = self.text2music_diffusion_process(
@@ -2062,6 +2079,8 @@ class ACEStepPipeline:
                 audio2audio_enable=audio2audio_enable,
                 ref_audio_strength=ref_audio_strength,
                 ref_latents=ref_latents,
+                shift=shift,
+                cancel_check=cancel_check,
             )
 
         end_time = time.time()
