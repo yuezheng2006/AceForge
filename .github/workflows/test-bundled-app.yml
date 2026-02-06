@@ -97,6 +97,32 @@ jobs:
         ./build/macos/codesign.sh dist/AceForge.app
       env:
         MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY || '-' }}
+
+    - name: Test training entry point (--train) from bundled app
+      run: |
+        BUNDLED_BIN="./dist/AceForge.app/Contents/MacOS/AceForge_bin"
+        if [ ! -f "$BUNDLED_BIN" ]; then
+          echo "::error::Bundled binary not found at $BUNDLED_BIN"
+          exit 1
+        fi
+        echo "Running bundled app with --train --help (must exit 0 and print trainer options)..."
+        OUTPUT=$("$BUNDLED_BIN" --train --help 2>&1) || EXIT=$?
+        EXIT=${EXIT:-0}
+        if [ "$EXIT" -ne 0 ]; then
+          echo "::error::Binary with --train --help exited with code $EXIT"
+          echo "$OUTPUT"
+          exit 1
+        fi
+        for opt in "--dataset_path" "--exp_name" "--epochs" "--max_steps"; do
+          if echo "$OUTPUT" | grep -q -- "$opt"; then
+            echo "✓ Trainer option $opt present"
+          else
+            echo "::error::Trainer help missing option: $opt"
+            echo "$OUTPUT"
+            exit 1
+          fi
+        done
+        echo "✓ Training-from-bundle entry point (--train) works correctly"
         
     - name: Download ACE-Step models (if not cached)
       if: steps.cache-models.outputs.cache-hit != 'true'

@@ -105,6 +105,19 @@ try:
 except Exception as e:
     print(f"[AceForge] WARNING: lzma initialization: {e}", flush=True)
 
+# When frozen and launched with --train, run the LoRA trainer in this process and exit (no GUI).
+# This allows Training to work from the app bundle; the parent app spawns us with --train + args.
+# For --train --help we only load the parser (no heavy deps) so the bundle test can pass.
+if getattr(sys, "frozen", False) and "--train" in sys.argv:
+    sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:] if a != "--train"]
+    if "--help" in sys.argv or "-h" in sys.argv:
+        from cdmf_trainer_parser import _make_parser
+        _make_parser().print_help()
+        sys.exit(0)
+    from cdmf_trainer import run_from_argv
+    run_from_argv()
+    sys.exit(0)
+
 # Import pywebview FIRST and patch it BEFORE importing music_forge_ui
 # This ensures that even if music_forge_ui tries to use webview, it will be protected
 import webview

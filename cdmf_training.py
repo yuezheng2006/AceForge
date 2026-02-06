@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
@@ -12,6 +13,7 @@ import signal
 import psutil
 
 from flask import Blueprint, jsonify, request
+from werkzeug.utils import secure_filename
 
 from ace_model_setup import ace_models_present
 from cdmf_paths import (
@@ -230,9 +232,13 @@ def _start_lora_training(
             f"{ds_path}: {exc}"
         )
 
-    trainer_script = APP_DIR / "cdmf_trainer.py"
-    if not trainer_script.exists():
-        return False, f"trainer.py not found at {trainer_script}"
+    # When frozen, we run the same executable with --train + args (no .py script).
+    # When not frozen, we run cdmf_trainer.py as a subprocess.
+    frozen = getattr(sys, "frozen", False)
+    if not frozen:
+        trainer_script = APP_DIR / "cdmf_trainer.py"
+        if not trainer_script.exists():
+            return False, f"trainer script not found at {trainer_script}"
 
     # Training logs live under APP_DIR / ace_training / <exp_name>, but the
     # heavy ACE-Step base model weights are cached in a shared root folder.
@@ -267,10 +273,10 @@ def _start_lora_training(
 
     cfg_path_str = str(cfg_path)
 
-    # Base command
+    # Base command: when frozen, second arg is --train (entry point); else path to trainer script
     cmd: list[str] = [
         sys.executable,
-        str(trainer_script),
+        "--train" if frozen else str(APP_DIR / "cdmf_trainer.py"),
         "--dataset_path",
         str(hf_ds_path),
         "--exp_name",
@@ -769,6 +775,44 @@ def create_training_blueprint() -> Blueprint:
             f"  val_interval_raw    = {val_interval_raw!r}",
             flush=True,
         )
+
+        # If the UI sent dataset_files (e.g. from Browse folder), save them under
+        # TRAINING_DATA_ROOT / dataset_path so _start_lora_training can use them.
+        uploaded = request.files.getlist("dataset_files") or request.files.getlist("files")
+        if uploaded and dataset_path:
+            ds_rel = Path(dataset_path)
+            if ds_rel.is_absolute() or ".." in dataset_path or dataset_path.startswith("/"):
+                html = (
+                    "<pre style='color:#f97373;'>"
+                    "ERROR: dataset_path must be a relative folder name (no path traversal).\n"
+                    "</pre>"
+                )
+                return html
+            target_dir = (TRAINING_DATA_ROOT / ds_rel).resolve()
+            try:
+                training_root_real = TRAINING_DATA_ROOT.resolve()
+            except Exception:  # noqa: BLE001
+                training_root_real = TRAINING_DATA_ROOT
+            if not str(target_dir).startswith(str(training_root_real)):
+                html = (
+                    "<pre style='color:#f97373;'>"
+                    "ERROR: dataset_path must be under training_datasets.\n"
+                    "</pre>"
+                )
+                return html
+            target_dir.mkdir(parents=True, exist_ok=True)
+            for f in uploaded:
+                if not f or not f.filename:
+                    continue
+                name = secure_filename(f.filename)
+                if not name:
+                    continue
+                dest = target_dir / name
+                try:
+                    f.save(str(dest))
+                except Exception as e:  # noqa: BLE001
+                    print(f"[CDMF] Failed to save uploaded file {f.filename}: {e}", flush=True)
+            print(f"[CDMF] Uploaded {len([x for x in uploaded if x and x.filename])} files to {target_dir}", flush=True)
 
         # LoRA config selection:
         # If the user picks a simple file name from the dropdown

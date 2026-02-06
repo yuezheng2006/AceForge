@@ -244,6 +244,8 @@ a = Analysis(
         'huggingface_hub',
         # ACE-Step wrapper module (imported with try/except in generate_ace.py)
         'cdmf_pipeline_ace_step',
+        # Trainer CLI parser (--train --help path; avoids loading full cdmf_trainer in frozen app)
+        'cdmf_trainer_parser',
         # Lyrics prompt model (lazily imported in cdmf_generation.py)
         'lyrics_prompt_model',
         # ACE-Step package and all its submodules (critical for frozen app)
