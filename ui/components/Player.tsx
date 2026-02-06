@@ -97,15 +97,17 @@ export const Player: React.FC<PlayerProps> = ({
     };
 
     const handleSeekInteraction = (e: React.MouseEvent<HTMLDivElement>, ref: React.RefObject<HTMLDivElement>) => {
-        if (!ref.current || !duration) return;
+        if (!ref.current || duration <= 0) return;
         const rect = ref.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const width = rect.width;
-        const percentage = Math.max(0, Math.min(1, x / width));
+        const percentage = Math.max(0, Math.min(1, width > 0 ? x / width : 0));
         onSeek(percentage * duration);
     };
 
-    const progressPercent = duration ? (currentTime / duration) * 100 : 0;
+    const progressPercent = duration > 0
+        ? Math.min(100, (currentTime / duration) * 100)
+        : 0;
 
     const handleDownload = async () => {
         if (!currentSong?.audioUrl) return;

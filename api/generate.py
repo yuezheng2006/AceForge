@@ -11,9 +11,11 @@ import uuid
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
 
-from cdmf_paths import get_output_dir, get_user_data_dir
+from cdmf_paths import get_output_dir, get_user_data_dir, load_config
 from cdmf_tracks import list_lora_adapters
 from cdmf_generation_job import GenerationCancelled
+import cdmf_state
+from generate_ace import register_job_progress_callback
 
 bp = Blueprint("api_generate", __name__)
 
@@ -64,6 +66,33 @@ def _resolve_audio_url_to_path(url: str) -> str | None:
     return None
 
 
+def _on_job_progress(
+    fraction: float,
+    stage: str,
+    steps_current: int | None,
+    steps_total: int | None,
+    eta_seconds: float | None,
+) -> None:
+    """Update current job's progress (called from generate_ace tqdm wrapper). Uses thread-local job id so parallel workers update the correct job."""
+    with _jobs_lock:
+        jid = cdmf_state.get_current_generation_job_id()
+        if jid is None:
+            return
+        job = _jobs.get(jid)
+        if not job:
+            return
+        job["progressPercent"] = round(fraction * 100.0, 1)
+        if steps_total is not None:
+            job["progressSteps"] = f"{steps_current or 0}/{steps_total}"
+        if eta_seconds is not None:
+            job["progressEta"] = round(eta_seconds, 1)
+        job["progressStage"] = stage or ""
+
+
+# Register so generate_ace's tqdm wrapper reports progress into the current job
+register_job_progress_callback(_on_job_progress)
+
+
 def _run_generation(job_id: str) -> None:
     """Background: run generate_track_ace and update job."""
     global _generation_busy, _current_job_id
@@ -72,8 +101,13 @@ def _run_generation(job_id: str) -> None:
         if not job or job.get("status") != "queued":
             return
         job["status"] = "running"
+        job["progressPercent"] = 0.0
+        job["progressSteps"] = None
+        job["progressEta"] = None
+        job["progressStage"] = ""
         _current_job_id = job_id
 
+    cdmf_state.set_current_generation_job_id(job_id)
     cancel_check = lambda: _is_cancel_requested(job_id)
     try:
         from generate_ace import generate_track_ace
@@ -84,14 +118,15 @@ def _run_generation(job_id: str) -> None:
         # Map ace-step-ui GenerationParams to our API (support full UI payload including duration=-1, seed=-1, bpm=0)
         custom_mode = bool(params.get("customMode", False))
         task = (params.get("taskType") or "text2music").strip().lower()
-        if task not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio"):
+        allowed_tasks = ("text2music", "retake", "repaint", "extend", "cover", "audio2audio", "lego", "extract", "complete")
+        if task not in allowed_tasks:
             task = "text2music"
         # Single style/caption field drives all text conditioning (ACE-Step caption).
-        # Optionally fold key, time signature, and vocal language into the prompt when set.
+        # Simple mode: songDescription. Advanced mode: style. Both can have key, time sig, vocal language.
         prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
         key_scale = (params.get("keyScale") or "").strip()
         time_sig = (params.get("timeSignature") or "").strip()
-        vocal_lang = (params.get("vocalLanguage") or "").strip()
+        vocal_lang = (params.get("vocalLanguage") or "").strip().lower()
         extra_bits = []
         if key_scale:
             extra_bits.append(f"key {key_scale}")
@@ -101,6 +136,10 @@ def _run_generation(job_id: str) -> None:
             extra_bits.append(f"vocal language {vocal_lang}")
         if extra_bits:
             prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
+        # When user explicitly chose English, reinforce in caption so model conditions on it
+        if vocal_lang == "en" and prompt:
+            if not prompt.lower().startswith("english"):
+                prompt = f"English vocals, {prompt}"
         if not prompt:
             # For cover/audio2audio, default encourages transformation while keeping structure; otherwise generic instrumental
             if task in ("cover", "audio2audio", "retake"):
@@ -126,6 +165,10 @@ def _run_generation(job_id: str) -> None:
             guidance_scale = float(params.get("guidanceScale") or 4.0)
         except (TypeError, ValueError):
             guidance_scale = 4.0
+        # Base/SFT models benefit from higher guidance (docs: 5.0-9.0 typical)
+        _dit = (load_config() or {}).get("ace_step_dit_model") or "turbo"
+        if _dit in ("base", "sft") and guidance_scale < 5.0:
+            guidance_scale = 5.0
         try:
             seed = int(params.get("seed") or 0)
         except (TypeError, ValueError):
@@ -179,6 +222,36 @@ def _run_generation(job_id: str) -> None:
             lora_weight = 0.75
         lora_weight = max(0.0, min(2.0, lora_weight))
 
+        # Thinking / LM / CoT (passed through so pipeline or future LM path can use them)
+        thinking = bool(params.get("thinking", False))
+        use_cot_metas = bool(params.get("useCotMetas", True))
+        use_cot_caption = bool(params.get("useCotCaption", True))
+        use_cot_language = bool(params.get("useCotLanguage", True))
+        try:
+            lm_temperature = float(params.get("lmTemperature") or params.get("lm_temperature") or 0.85)
+        except (TypeError, ValueError):
+            lm_temperature = 0.85
+        lm_temperature = max(0.0, min(2.0, lm_temperature))
+        try:
+            lm_cfg_scale = float(params.get("lmCfgScale") or params.get("lm_cfg_scale") or 2.0)
+        except (TypeError, ValueError):
+            lm_cfg_scale = 2.0
+        try:
+            lm_top_k = int(params.get("lmTopK") or params.get("lm_top_k") or 0)
+        except (TypeError, ValueError):
+            lm_top_k = 0
+        try:
+            lm_top_p = float(params.get("lmTopP") or params.get("lm_top_p") or 0.9)
+        except (TypeError, ValueError):
+            lm_top_p = 0.9
+        lm_negative_prompt = (params.get("lmNegativePrompt") or params.get("lm_negative_prompt") or "NO USER INPUT").strip()
+
+        # Log model tag for quality tracking (from job or config)
+        with _jobs_lock:
+            j = _jobs.get(job_id)
+            dit_tag = (j.get("dit_model") or "turbo") if j else "turbo"
+            lm_tag = (j.get("lm_model") or "1.7B") if j else "1.7B"
+        logging.info("[API generate] Using dit=%s, lm=%s", dit_tag, lm_tag)
         if src_audio_path:
             logging.info("[API generate] Using reference audio: %s (task=%s, audio2audio=%s)", src_audio_path, task, audio2audio_enable)
         else:
@@ -216,6 +289,16 @@ def _run_generation(job_id: str) -> None:
             lora_name_or_path=lora_name_or_path or None,
             lora_weight=lora_weight,
             cancel_check=cancel_check,
+            vocal_language=vocal_lang or "",
+            thinking=thinking,
+            use_cot_metas=use_cot_metas,
+            use_cot_caption=use_cot_caption,
+            use_cot_language=use_cot_language,
+            lm_temperature=lm_temperature,
+            lm_cfg_scale=lm_cfg_scale,
+            lm_top_k=lm_top_k,
+            lm_top_p=lm_top_p,
+            lm_negative_prompt=lm_negative_prompt,
         )
 
         wav_path = summary.get("wav_path")
@@ -254,6 +337,7 @@ def _run_generation(job_id: str) -> None:
                 job["status"] = "failed"
                 job["error"] = str(e)
     finally:
+        cdmf_state.set_current_generation_job_id(None)
         _generation_busy = False
         with _jobs_lock:
             _current_job_id = None
@@ -307,6 +391,9 @@ def create_job():
             params_copy = dict(data)
         except (TypeError, ValueError):
             params_copy = {}
+        config = load_config()
+        dit_tag = config.get("ace_step_dit_model") or params_copy.get("aceStepDitModel") or "turbo"
+        lm_tag = config.get("ace_step_lm") or params_copy.get("aceStepLm") or "1.7B"
         with _jobs_lock:
             _jobs[job_id] = {
                 "status": "queued",
@@ -315,6 +402,12 @@ def create_job():
                 "error": None,
                 "startTime": time.time(),
                 "queuePosition": len(_job_order) + 1,
+                "progressPercent": None,
+                "progressSteps": None,
+                "progressEta": None,
+                "progressStage": None,
+                "dit_model": dit_tag,
+                "lm_model": lm_tag,
             }
             _job_order.append(job_id)
             pos = _jobs[job_id]["queuePosition"]
@@ -323,7 +416,7 @@ def create_job():
             _generation_busy = True
             threading.Thread(target=_run_generation, args=(job_id,), daemon=True).start()
 
-        logging.info("[API generate] Job %s queued at position %s", job_id, pos)
+        logging.info("[API generate] Job %s (dit=%s, lm=%s) queued at position %s", job_id, dit_tag, lm_tag, pos)
         return jsonify({
             "jobId": job_id,
             "status": "queued",
@@ -342,11 +435,15 @@ def get_status(job_id: str):
     if not job:
         return jsonify({"error": "Job not found"}), 404
     status = job.get("status", "unknown")
+    progress_eta = job.get("progressEta")
     out = {
         "jobId": job_id,
         "status": status,
         "queuePosition": job.get("queuePosition"),
-        "etaSeconds": 180,
+        "etaSeconds": int(progress_eta) if progress_eta is not None else None,
+        "progressPercent": job.get("progressPercent"),
+        "progressSteps": job.get("progressSteps"),
+        "progressStage": job.get("progressStage"),
         "result": job.get("result"),
         "error": job.get("error"),
     }

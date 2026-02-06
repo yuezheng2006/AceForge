@@ -246,6 +246,9 @@ a = Analysis(
         'cdmf_pipeline_ace_step',
         # Trainer CLI parser (--train --help path; avoids loading full cdmf_trainer in frozen app)
         'cdmf_trainer_parser',
+        # ACE-Step 1.5 model downloader (bundled so acestep-download is always available)
+        'acestep15_downloader',
+        'acestep15_downloader.model_downloader',
         # Lyrics prompt model (lazily imported in cdmf_generation.py)
         'lyrics_prompt_model',
         # ACE-Step package and all its submodules (critical for frozen app)

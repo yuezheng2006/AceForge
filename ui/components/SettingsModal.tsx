@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn } from 'lucide-react';
+import { X, User as UserIcon, Palette, Info, Edit3, ExternalLink, Github, FolderOpen, HardDrive, ZoomIn, Box } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { EditProfileModal } from './EditProfileModal';
-import { preferencesApi } from '../services/api';
+import { preferencesApi, aceStepModelsApi } from '../services/api';
+import type { AceStepDownloadStatus } from '../services/api';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -14,6 +15,24 @@ interface SettingsModalProps {
 
 const ZOOM_OPTIONS = [80, 90, 100, 110, 125] as const;
 
+/** ACE-Step DiT executor variants (Tutorial). */
+const ACE_STEP_DIT_OPTIONS = [
+  { value: 'turbo', label: 'Turbo (default)', desc: 'Best balance, 8 steps' },
+  { value: 'turbo-shift1', label: 'Turbo shift=1', desc: 'Richer details' },
+  { value: 'turbo-shift3', label: 'Turbo shift=3', desc: 'Clearer timbre' },
+  { value: 'turbo-continuous', label: 'Turbo continuous', desc: 'Flexible shift 1–5' },
+  { value: 'sft', label: 'SFT', desc: '50 steps, CFG' },
+  { value: 'base', label: 'Base', desc: '50 steps, CFG' },
+] as const;
+
+/** ACE-Step LM planner sizes (Tutorial). */
+const ACE_STEP_LM_OPTIONS = [
+  { value: 'none', label: 'No LM' },
+  { value: '0.6B', label: '0.6B' },
+  { value: '1.7B', label: '1.7B (default)' },
+  { value: '4B', label: '4B' },
+] as const;
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onToggleTheme, onNavigateToProfile }) => {
     const { user } = useAuth();
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -23,6 +42,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
     const [outputDirSaved, setOutputDirSaved] = useState(false);
     const [uiZoom, setUiZoom] = useState(80);
     const [uiZoomSaved, setUiZoomSaved] = useState(false);
+    const [aceStepDitModel, setAceStepDitModel] = useState<string>('turbo');
+    const [aceStepLm, setAceStepLm] = useState<string>('1.7B');
+    const [modelsSaved, setModelsSaved] = useState(false);
+    const [aceStepList, setAceStepList] = useState<{ dit_models: Array<{ id: string; label: string; description?: string; installed: boolean }>; lm_models: Array<{ id: string; label: string; installed: boolean }>; discovered_models?: Array<{ id: string; label: string; path: string; custom: boolean }>; acestep_download_available: boolean } | null>(null);
+    const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+    const [downloadError, setDownloadError] = useState<string | null>(null);
+    const [downloadStatus, setDownloadStatus] = useState<AceStepDownloadStatus | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -32,10 +58,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                     setModelsFolder(prefs.models_folder ?? '');
                     const z = prefs.ui_zoom ?? 80;
                     setUiZoom(ZOOM_OPTIONS.includes(z as typeof ZOOM_OPTIONS[number]) ? (z as number) : 80);
+                    const ditVal = prefs.ace_step_dit_model ?? 'turbo';
+                    setAceStepDitModel(ACE_STEP_DIT_OPTIONS.some((o) => o.value === ditVal) ? ditVal : 'turbo');
+                    const lmVal = prefs.ace_step_lm ?? '1.7B';
+                    setAceStepLm(ACE_STEP_LM_OPTIONS.some((o) => o.value === lmVal) ? lmVal : '1.7B');
                 })
                 .catch(() => {});
+            aceStepModelsApi.list().then(setAceStepList).catch(() => setAceStepList(null));
+            aceStepModelsApi.downloadStatus().then(setDownloadStatus).catch(() => setDownloadStatus(null));
         }
     }, [isOpen]);
+
+    // Poll download status while a download is running (so we show progress and know when it finishes)
+    useEffect(() => {
+        if (!isOpen || !downloadStatus?.running) return;
+        const interval = setInterval(() => {
+            aceStepModelsApi.downloadStatus()
+                .then((s) => {
+                    setDownloadStatus(s);
+                    if (!s.running) {
+                        setDownloadingModel(null);
+                        if (s.error && !s.cancelled) setDownloadError(s.error);
+                        aceStepModelsApi.list().then(setAceStepList).catch(() => {});
+                    }
+                })
+                .catch(() => {});
+        }, 1500);
+        return () => clearInterval(interval);
+    }, [isOpen, downloadStatus?.running]);
+
+    // Restrict selection to installed or discovered models: if current choice not in list, switch to first available
+    useEffect(() => {
+        if (!aceStepList) return;
+        const installedDit = aceStepList.dit_models.filter((m) => m.installed);
+        const discovered = aceStepList.discovered_models ?? [];
+        const allDitIds = new Set([...installedDit.map((m) => m.id), ...discovered.map((d) => d.id)]);
+        const installedLm = aceStepList.lm_models.filter((m) => m.installed);
+        const ditOk = allDitIds.has(aceStepDitModel);
+        const lmOk = installedLm.some((m) => m.id === aceStepLm);
+        if (!ditOk && (installedDit.length > 0 || discovered.length > 0)) {
+            const fallback = installedDit[0]?.id ?? discovered[0]?.id ?? 'turbo';
+            setAceStepDitModel(fallback);
+            preferencesApi.update({ ace_step_dit_model: fallback }).catch(() => {});
+        }
+        if (!lmOk && installedLm.length > 0) {
+            const fallback = installedLm[0].id;
+            setAceStepLm(fallback);
+            preferencesApi.update({ ace_step_lm: fallback }).catch(() => {});
+        }
+    }, [aceStepList]); // eslint-disable-line react-hooks/exhaustive-deps -- only run when list changes, sync selection once
 
     const saveOutputDir = () => {
         preferencesApi.update({ output_dir: outputDir.trim() || undefined })
@@ -46,6 +117,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
     const saveModelsFolder = () => {
         preferencesApi.update({ models_folder: modelsFolder.trim() || undefined })
             .then(() => { setModelsFolderSaved(true); setTimeout(() => setModelsFolderSaved(false), 2000); })
+            .catch(() => {});
+    };
+
+    const saveAceStepModels = (dit?: string, lm?: string) => {
+        const nextDit = dit ?? aceStepDitModel;
+        const nextLm = lm ?? aceStepLm;
+        if (dit != null) setAceStepDitModel(nextDit);
+        if (lm != null) setAceStepLm(nextLm);
+        preferencesApi.update({
+            ace_step_dit_model: nextDit || 'turbo',
+            ace_step_lm: nextLm || '1.7B',
+        })
+            .then(() => { setModelsSaved(true); setTimeout(() => setModelsSaved(false), 2000); })
             .catch(() => {});
     };
 
@@ -129,6 +213,199 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, t
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* ACE-Step Models */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+                            <Box size={20} />
+                            <h3 className="font-semibold">Models</h3>
+                        </div>
+                        <div className="pl-7 space-y-4">
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
+                                ACE-Step executor (DiT) and planner (LM). See Tutorial for VRAM and quality trade-offs.
+                            </p>
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">Current ACE-Step model</label>
+                                <p className="text-sm text-zinc-900 dark:text-white font-medium">
+                                    {(() => {
+                                        const discovered = aceStepList?.discovered_models ?? [];
+                                        const effDit = aceStepDitModel;
+                                        const effLm = aceStepLm;
+                                        const ditLabel = ACE_STEP_DIT_OPTIONS.find((o) => o.value === effDit)?.label ?? discovered.find((d) => d.id === effDit)?.label ?? effDit;
+                                        const lmLabel = ACE_STEP_LM_OPTIONS.find((o) => o.value === effLm)?.label ?? effLm;
+                                        return `${ditLabel} · LM: ${lmLabel}`;
+                                    })()}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">ACE-Step (DiT) model</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Installed and discovered models in the checkpoints folder. Custom models appear when placed there.</p>
+                                <select
+                                    value={aceStepList?.dit_models.some((m) => m.id === aceStepDitModel && m.installed) || (aceStepList?.discovered_models ?? []).some((d) => d.id === aceStepDitModel) ? aceStepDitModel : (aceStepList?.dit_models.find((m) => m.installed)?.id ?? aceStepList?.discovered_models?.[0]?.id ?? 'turbo')}
+                                    onChange={(e) => saveAceStepModels(e.target.value, undefined)}
+                                    className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                >
+                                    {aceStepList
+                                        ? (() => {
+                                            const installed = aceStepList.dit_models.filter((m) => m.installed);
+                                            const discovered = aceStepList.discovered_models ?? [];
+                                            const seen = new Set(installed.map((m) => m.id));
+                                            const options: Array<{ id: string; label: string }> = installed.map((m) => {
+                                                const o = ACE_STEP_DIT_OPTIONS.find((opt) => opt.value === m.id);
+                                                return { id: m.id, label: o ? `${o.label} — ${o.desc}` : m.label };
+                                            });
+                                            discovered.forEach((d) => {
+                                                if (!seen.has(d.id)) {
+                                                    seen.add(d.id);
+                                                    options.push({ id: d.id, label: d.custom ? `Custom: ${d.label}` : d.label });
+                                                }
+                                            });
+                                            return options.map((opt) => <option key={opt.id} value={opt.id}>{opt.label}</option>);
+                                        })()
+                                        : <option value="turbo">Loading…</option>}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-1">LM planner</label>
+                                <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-1">Bundled ACE-Step 5Hz LM (no external LLM). Used when &quot;Thinking&quot; is on in Create. Download the model below if needed; only installed options appear here.</p>
+                                <select
+                                    value={aceStepList?.lm_models.some((m) => m.id === aceStepLm && m.installed) ? aceStepLm : (aceStepList?.lm_models.find((m) => m.installed)?.id ?? 'none')}
+                                    onChange={(e) => saveAceStepModels(undefined, e.target.value)}
+                                    className="w-full rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-white"
+                                >
+                                    {aceStepList
+                                        ? aceStepList.lm_models.filter((m) => m.installed).map((m) => {
+                                            const o = ACE_STEP_LM_OPTIONS.find((opt) => opt.value === m.id);
+                                            return <option key={m.id} value={m.id}>{o ? o.label : m.label}</option>;
+                                        })
+                                        : <option value="none">Loading…</option>}
+                                </select>
+                            </div>
+                            {modelsSaved && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+                            {/* Download models */}
+                            {aceStepList && (
+                                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-white/5">
+                                    <label className="text-sm text-zinc-500 dark:text-zinc-400 block mb-2">Download models</label>
+                                    <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">
+                                        {aceStepList.acestep_download_available
+                                            ? 'Download DiT or LM models into the checkpoints folder. (Bundled in app.)'
+                                            : 'Downloader not available in this build. Default (Turbo) uses the app download.'}
+                                    </p>
+                                    {downloadError && <p className="text-xs text-red-600 dark:text-red-400 mb-2">{downloadError}</p>}
+                                    {downloadStatus?.running && (
+                                        <div className="mb-3 p-3 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-white/10">
+                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                                                    Downloading {downloadStatus.model ?? '…'}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        aceStepModelsApi.downloadCancel()
+                                                            .then(() => { aceStepModelsApi.downloadStatus().then(setDownloadStatus); });
+                                                    }}
+                                                    className="text-xs px-2 py-1 rounded bg-red-500/90 text-white hover:bg-red-600"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                            <div className="h-2 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-pink-500 transition-all duration-300"
+                                                    style={{ width: `${Math.round((downloadStatus.progress ?? 0) * 100)}%` }}
+                                                />
+                                            </div>
+                                            <div className="flex justify-between mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                                <span>
+                                                    {downloadStatus.file_index != null && downloadStatus.total_files != null
+                                                        ? `File ${downloadStatus.file_index}/${downloadStatus.total_files}`
+                                                        : `${Math.round((downloadStatus.progress ?? 0) * 100)}%`}
+                                                    {downloadStatus.current_file ? ` · ${downloadStatus.current_file}` : ''}
+                                                </span>
+                                                {downloadStatus.eta_seconds != null && downloadStatus.eta_seconds > 0 && (
+                                                    <span>~{Math.ceil(downloadStatus.eta_seconds)}s left</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400">DiT</div>
+                                        {aceStepList.dit_models.map((m) => (
+                                            <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                                                <span className="text-zinc-900 dark:text-white">{m.label}</span>
+                                                {m.installed ? (
+                                                    <span className="text-xs text-green-600 dark:text-green-400">Installed</span>
+                                                ) : !aceStepList.acestep_download_available && m.id !== 'turbo' ? (
+                                                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Requires ACE-Step 1.5 CLI</span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={downloadStatus?.running === true}
+                                                        onClick={() => {
+                                                            setDownloadError(null);
+                                                            setDownloadingModel(m.id);
+                                                            aceStepModelsApi.download(m.id)
+                                                                .then((r) => {
+                                                                    if (r.error) {
+                                                                        setDownloadError(r.hint ? `${r.error} ${r.hint}` : r.error);
+                                                                        setDownloadingModel(null);
+                                                                    } else {
+                                                                        aceStepModelsApi.downloadStatus().then(setDownloadStatus);
+                                                                    }
+                                                                })
+                                                                .catch((err) => {
+                                                                    setDownloadError(err?.message || 'Download failed');
+                                                                    setDownloadingModel(null);
+                                                                });
+                                                        }}
+                                                        className="text-xs px-2 py-1 rounded bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50"
+                                                    >
+                                                        {downloadingModel === m.id || (downloadStatus?.running && downloadStatus?.model === m.id) ? '…' : 'Download'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 pt-1">LM</div>
+                                        {aceStepList.lm_models.map((m) => (
+                                            <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
+                                                <span className="text-zinc-900 dark:text-white">{m.label}</span>
+                                                {m.installed ? (
+                                                    <span className="text-xs text-green-600 dark:text-green-400">Installed</span>
+                                                ) : !aceStepList.acestep_download_available ? (
+                                                    <span className="text-xs text-zinc-500 dark:text-zinc-400">Requires ACE-Step 1.5 CLI</span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        disabled={downloadStatus?.running === true}
+                                                        onClick={() => {
+                                                            setDownloadError(null);
+                                                            setDownloadingModel(m.id);
+                                                            aceStepModelsApi.download(m.id)
+                                                                .then((r) => {
+                                                                    if (r.error) {
+                                                                        setDownloadError(r.error);
+                                                                        setDownloadingModel(null);
+                                                                    } else {
+                                                                        aceStepModelsApi.downloadStatus().then(setDownloadStatus);
+                                                                    }
+                                                                })
+                                                                .catch((err) => {
+                                                                    setDownloadError(err?.message || 'Download failed');
+                                                                    setDownloadingModel(null);
+                                                                });
+                                                        }}
+                                                        className="text-xs px-2 py-1 rounded bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50"
+                                                    >
+                                                        {downloadingModel === m.id || (downloadStatus?.running && downloadStatus?.model === m.id) ? '…' : 'Download'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

@@ -270,11 +270,63 @@ export interface GenerationParams {
   loraWeight?: number;
 }
 
+/** ACE-Step model list item (DiT or LM). */
+export interface AceStepModelItem {
+  id: string;
+  label: string;
+  description?: string;
+  installed: boolean;
+  steps?: number;
+  cfg?: boolean;
+  exclusive_tasks?: string[];
+}
+
+export interface AceStepDiscoveredModel {
+  id: string;
+  label: string;
+  path: string;
+  custom: boolean;
+}
+
+export interface AceStepModelsResponse {
+  dit_models: AceStepModelItem[];
+  lm_models: AceStepModelItem[];
+  discovered_models: AceStepDiscoveredModel[];
+  acestep_download_available: boolean;
+  checkpoints_path: string;
+}
+
+export interface AceStepDownloadStatus {
+  running: boolean;
+  model: string | null;
+  progress: number;
+  error: string | null;
+  current_file?: string | null;
+  file_index?: number;
+  total_files?: number;
+  eta_seconds?: number | null;
+  cancelled?: boolean;
+}
+
+export const aceStepModelsApi = {
+  list: (): Promise<AceStepModelsResponse> =>
+    api('/api/ace-step/models') as Promise<AceStepModelsResponse>,
+  download: (model: string): Promise<{ ok?: boolean; started?: boolean; error?: string; path?: string; hint?: string }> =>
+    api('/api/ace-step/models/download', { method: 'POST', body: { model } }),
+  downloadStatus: (): Promise<AceStepDownloadStatus> =>
+    api('/api/ace-step/models/status') as Promise<AceStepDownloadStatus>,
+  downloadCancel: (): Promise<{ cancelled: boolean; message: string }> =>
+    api('/api/ace-step/models/download/cancel', { method: 'POST' }),
+};
+
 export interface GenerationJob {
   jobId: string;
   status: 'pending' | 'queued' | 'running' | 'succeeded' | 'failed';
   queuePosition?: number;
   etaSeconds?: number;
+  progressPercent?: number;
+  progressSteps?: string;
+  progressStage?: string;
   result?: {
     audioUrls: string[];
     bpm?: number;
@@ -499,6 +551,10 @@ export interface AppPreferences {
   models_folder?: string;
   /** UI zoom percent (50–150). Takes effect on next app launch. */
   ui_zoom?: number;
+  /** ACE-Step DiT model variant: turbo (default), turbo-shift1, turbo-shift3, turbo-continuous, sft, base. */
+  ace_step_dit_model?: string;
+  /** ACE-Step LM planner: none, 0.6B, 1.7B (default), 4B. Used when thinking mode is on. */
+  ace_step_lm?: string;
   stem_split?: { out_dir?: string; stem_count?: string; mode?: string; device_preference?: string; export_format?: string };
   voice_clone?: Record<string, unknown>;
   midi_gen?: Record<string, unknown>;

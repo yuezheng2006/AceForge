@@ -137,19 +137,50 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [keyScale, setKeyScale] = useState('');
   const [timeSignature, setTimeSignature] = useState('');
 
+  // Quality preset: applies steps, guidance, thinking, CoT in one click (default: Good)
+  type QualityPreset = 'fast' | 'good' | 'best' | 'custom';
+  const [qualityPreset, setQualityPreset] = useState<QualityPreset>('good');
+
   // Advanced Settings
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [duration, setDuration] = useState(-1);
   const [batchSize, setBatchSize] = useState(1);
   const [bulkCount, setBulkCount] = useState(1); // Number of independent generation jobs to queue
-  const [guidanceScale, setGuidanceScale] = useState(4.0);
+  const [guidanceScale, setGuidanceScale] = useState(5.5);
   const [randomSeed, setRandomSeed] = useState(true);
   const [seed, setSeed] = useState(-1);
-  const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
+  const [thinking, setThinking] = useState(true);
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [inferenceSteps, setInferenceSteps] = useState(65);
+  const [inferenceSteps, setInferenceSteps] = useState(40);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [shift, setShift] = useState(3.0);
+
+  const applyPreset = (preset: QualityPreset) => {
+    setQualityPreset(preset);
+    if (preset === 'fast') {
+      setInferenceSteps(12);
+      setGuidanceScale(4.0);
+      setThinking(false);
+      setUseCotMetas(false);
+      setUseCotCaption(false);
+      setUseCotLanguage(false);
+    } else if (preset === 'good') {
+      setInferenceSteps(40);
+      setGuidanceScale(5.5);
+      setThinking(true);
+      setUseCotMetas(true);
+      setUseCotCaption(true);
+      setUseCotLanguage(true);
+    } else if (preset === 'best') {
+      setInferenceSteps(70);
+      setGuidanceScale(7.0);
+      setThinking(true);
+      setUseCotMetas(true);
+      setUseCotCaption(true);
+      setUseCotLanguage(true);
+    }
+    // 'custom' = don't change anything
+  };
 
   // LM Parameters (under Expert)
   const [showLmParams, setShowLmParams] = useState(false);
@@ -1020,7 +1051,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                         Cover: {getAudioLabel(sourceAudioUrl)}
                       </p>
                     )}
-                    {!referenceAudioUrl && !sourceAudioUrl && (taskType === 'cover' || taskType === 'audio2audio' || taskType === 'repaint' || taskType === 'extend') && (
+                    {!referenceAudioUrl && !sourceAudioUrl && (taskType === 'cover' || taskType === 'audio2audio' || taskType === 'repaint' || taskType === 'extend' || taskType === 'lego' || taskType === 'extract' || taskType === 'complete') && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">Source/cover audio required for this mode</p>
                     )}
                   </div>
@@ -1393,6 +1424,25 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <p className="text-[10px] text-zinc-500">Queue multiple independent generation jobs with same settings</p>
             </div>
 
+            {/* Quality Preset */}
+            <div className="space-y-2">
+              <span className="inline-flex gap-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Quality preset</label>
+                <InfoTooltip text="Fast: ~12 steps, no Thinking. Good: ~40 steps + Thinking/CoT. Best: ~70 steps + full CoT. Custom: use sliders below." />
+              </span>
+              <select
+                value={qualityPreset}
+                onChange={(e) => applyPreset(e.target.value as QualityPreset)}
+                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none"
+              >
+                <option value="fast">Fast — fewer steps, no LM</option>
+                <option value="good">Good — balanced (steps + Thinking)</option>
+                <option value="best">Best — max quality (steps + full CoT)</option>
+                <option value="custom">Custom — use sliders only</option>
+              </select>
+              <p className="text-[10px] text-zinc-500">Preset updates steps, guidance, and Thinking/CoT below</p>
+            </div>
+
             {/* Inference Steps */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1405,13 +1455,13 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <input
                 type="range"
                 min="4"
-                max="32"
+                max="75"
                 step="1"
                 value={inferenceSteps}
-                onChange={(e) => setInferenceSteps(Number(e.target.value))}
+                onChange={(e) => { setInferenceSteps(Number(e.target.value)); setQualityPreset('custom'); }}
                 className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
               />
-              <p className="text-[10px] text-zinc-500">65 recommended for quality; more steps = slower</p>
+              <p className="text-[10px] text-zinc-500">65 recommended for quality; base/SFT can use up to 75 steps</p>
             </div>
 
             {/* Guidance Scale */}
@@ -1429,7 +1479,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 max="15"
                 step="0.5"
                 value={guidanceScale}
-                onChange={(e) => setGuidanceScale(Number(e.target.value))}
+                onChange={(e) => { setGuidanceScale(Number(e.target.value)); setQualityPreset('custom'); }}
                 className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
               />
               <p className="text-[10px] text-zinc-500">How closely to follow the prompt</p>
@@ -1544,10 +1594,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="flex items-center justify-between py-2 border-t border-zinc-100 dark:border-white/5">
               <span className="inline-flex items-center gap-1.5">
                 <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Thinking (CoT)</span>
-                <InfoTooltip text="Enable 5Hz Language Model chain-of-thought for metadata (BPM, key, duration) and caption refinement. Off = faster, less GPU." />
+                <InfoTooltip text="Enable LM chain-of-thought for metadata and caption refinement when a thinking LM is selected in Settings. Params are sent to the backend; full LM path may require ACE-Step 1.5 integration." />
               </span>
               <button
-                onClick={() => setThinking(!thinking)}
+                onClick={() => { setThinking(!thinking); setQualityPreset('custom'); }}
                 className={`w-10 h-5 rounded-full flex items-center transition-colors duration-200 px-0.5 border border-zinc-200 dark:border-white/5 ${thinking ? 'bg-pink-600' : 'bg-zinc-300 dark:bg-black/40'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white transform transition-transform duration-200 shadow-sm ${thinking ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -1725,13 +1775,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 {(taskType === 'cover' || taskType === 'audio2audio') && 'Transform an existing track: set a source/cover audio and describe the new style. Use Cover Strength to control how much to follow the original.'}
                 {taskType === 'repaint' && 'Regenerate only a time segment of the source. Set start/end (seconds; -1 = end of file) and style for that section.'}
                 {taskType === 'extend' && 'Extend the source audio. Use source audio and optional style for the continuation.'}
+                {(taskType === 'lego' || taskType === 'extract' || taskType === 'complete') && 'Requires ACE-Step 1.5 Base model. Lego: add new tracks to existing. Extract: separate stems. Complete: add accompaniment to a single track.'}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <span className="inline-flex items-center gap-1.5">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Task Type</label>
-                  <InfoTooltip text="Text→Music: from prompt only. Cover/Audio→Audio: transform a track. Repaint: regenerate a time segment. Extend: continue source audio." />
+                  <InfoTooltip text="Text→Music: from prompt only. Cover/Audio→Audio: transform a track. Repaint: regenerate a segment. Extend: continue source. Lego/Extract/Complete require Base model (Settings → Models)." />
                 </span>
                 <select
                   value={taskType}
@@ -1743,9 +1794,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   <option value="cover">Cover</option>
                   <option value="repaint">Repaint</option>
                   <option value="extend">Extend</option>
+                  <option value="lego">Lego (add tracks)</option>
+                  <option value="extract">Extract (stems)</option>
+                  <option value="complete">Complete (accompaniment)</option>
                 </select>
               </div>
-              {(taskType === 'cover' || taskType === 'audio2audio' || taskType === 'repaint' || taskType === 'extend') && (
+              {(taskType === 'cover' || taskType === 'audio2audio' || taskType === 'repaint' || taskType === 'extend' || taskType === 'lego' || taskType === 'extract' || taskType === 'complete') && (
                 <div className="space-y-2 col-span-2">
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1.5">

@@ -282,6 +282,17 @@ class StreamToLogger:
         
         return None
 
+    def _prefix_job_id(self, msg):
+        """If a generation job is active in this thread, prefix the message with job id."""
+        try:
+            job_id = cdmf_state.get_current_generation_job_id()
+            if job_id:
+                short_id = job_id[:8] if len(job_id) >= 8 else job_id
+                return f"[{short_id}] {msg}"
+        except Exception:
+            pass
+        return msg
+
     def write(self, buf):
         # Handle partial writes by buffering until we get a newline
         temp_buf = self.linebuf + buf
@@ -305,12 +316,12 @@ class StreamToLogger:
                 if progress_msg:
                     # Only log if it's different from last progress (avoid duplicates)
                     if progress_msg != self.last_progress:
-                        self.logger.log(logging.INFO, progress_msg)
+                        self.logger.log(logging.INFO, self._prefix_job_id(progress_msg))
                         self.last_progress = progress_msg
                     continue
                 
-                # Log other messages normally
-                self.logger.log(self.log_level, line_clean)
+                # Log other messages normally (with optional job id prefix)
+                self.logger.log(self.log_level, self._prefix_job_id(line_clean))
         
         # Keep any incomplete line in buffer
         if lines and not lines[-1].endswith(('\n', '\r\n', '\r')):
@@ -326,10 +337,10 @@ class StreamToLogger:
                 progress_msg = self._extract_progress(line_clean)
                 if progress_msg:
                     if progress_msg != self.last_progress:
-                        self.logger.log(logging.INFO, progress_msg)
+                        self.logger.log(logging.INFO, self._prefix_job_id(progress_msg))
                         self.last_progress = progress_msg
                 else:
-                    self.logger.log(self.log_level, line_clean)
+                    self.logger.log(self.log_level, self._prefix_job_id(line_clean))
             self.linebuf = ''
 
 # Redirect stdout and stderr to logging (for frozen app)
@@ -382,6 +393,7 @@ try:
         reference_tracks_bp,
         search_bp,
         preferences_bp,
+        ace_step_models_bp,
     )
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(songs_bp, url_prefix="/api/songs")
@@ -392,6 +404,7 @@ try:
     app.register_blueprint(reference_tracks_bp, url_prefix="/api/reference-tracks")
     app.register_blueprint(search_bp, url_prefix="/api/search")
     app.register_blueprint(preferences_bp, url_prefix="/api/preferences")
+    app.register_blueprint(ace_step_models_bp, url_prefix="/api/ace-step")
 except ImportError as e:
     print(f"[AceForge] New UI API not available: {e}", flush=True)
 

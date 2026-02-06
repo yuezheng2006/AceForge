@@ -282,7 +282,7 @@ const SongItem: React.FC<SongItemProps> = ({
                 )}
 
                 {song.isGenerating ? (
-                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1">
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 px-2">
                         {song.queuePosition ? (
                             /* Queue indicator */
                             <>
@@ -292,13 +292,24 @@ const SongItem: React.FC<SongItemProps> = ({
                                 <span className="text-[10px] font-medium text-amber-400">Queue #{song.queuePosition}</span>
                             </>
                         ) : (
-                            /* Generating - Music Waveform Animation */
-                            <div className="flex items-end gap-1 h-6">
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
-                                <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
-                            </div>
+                            /* Generating - progress % and ETA */
+                            <>
+                                <div className="flex items-end gap-1 h-5">
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.0s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.2s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.4s' }}></div>
+                                    <div className="w-1 bg-pink-500 rounded-full music-bar-anim" style={{ animationDelay: '0.1s' }}></div>
+                                </div>
+                                {(song.generationPercent != null || song.generationSteps) && (
+                                    <div className="text-[10px] font-medium text-pink-300 text-center">
+                                        {song.generationPercent != null && <span>{Math.round(song.generationPercent)}%</span>}
+                                        {song.generationSteps && <span> ({song.generationSteps})</span>}
+                                        {song.generationEtaSeconds != null && song.generationEtaSeconds > 0 && (
+                                            <span> · ~{Math.ceil(song.generationEtaSeconds)}s left</span>
+                                        )}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 ) : (
@@ -325,7 +336,7 @@ const SongItem: React.FC<SongItemProps> = ({
                 <div className="space-y-1">
                     <div className="flex items-center gap-2">
                         <h3 className={`font-bold text-lg truncate ${isCurrent ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-900 dark:text-white'}`}>
-                            {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : "Creating...") : "Untitled")}
+                            {song.title || (song.isGenerating ? (song.queuePosition ? "Queued..." : (song.generationPercent != null ? `Creating... ${Math.round(song.generationPercent)}%` : "Creating...")) : "Untitled")}
                         </h3>
                         <span className="inline-flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-r from-pink-500 to-purple-500 px-1.5 py-0.5 rounded-sm shadow-sm">
                             v1.5
@@ -440,7 +451,7 @@ const SongItem: React.FC<SongItemProps> = ({
             <div className="text-xs font-mono text-zinc-500 dark:text-zinc-600 self-start pt-1">
                 {song.isGenerating ? (
                     <span className={song.queuePosition ? 'text-amber-500' : 'text-pink-500'}>
-                        {song.queuePosition ? `#${song.queuePosition}` : 'Creating...'}
+                        {song.queuePosition ? `#${song.queuePosition}` : (song.generationPercent != null ? `${Math.round(song.generationPercent)}%` : 'Creating...')}
                     </span>
                 ) : song.duration}
             </div>

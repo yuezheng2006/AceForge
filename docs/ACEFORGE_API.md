@@ -187,12 +187,31 @@ App-wide settings (paths, UI zoom, optional module config). Stored in `aceforge_
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/preferences` | Full config object. Keys may include: `output_dir`, `models_folder`, `ui_zoom`, `stem_split`, `voice_clone`, `midi_gen`, `training`. |
-| PATCH | `/api/preferences` | Merge partial object and save. Returns full config. Example: `{ "output_dir": "/path", "models_folder": "/path", "ui_zoom": 90 }`. |
+| GET | `/api/preferences` | Full config object. Keys may include: `output_dir`, `models_folder`, `ui_zoom`, `ace_step_dit_model`, `ace_step_lm`, `stem_split`, `voice_clone`, `midi_gen`, `training`. |
+| PATCH | `/api/preferences` | Merge partial object and save. Returns full config. Example: `{ "output_dir": "/path", "models_folder": "/path", "ui_zoom": 90, "ace_step_dit_model": "turbo", "ace_step_lm": "1.7B" }`. |
+
+**ACE-Step model preferences** (see ACE-Step Tutorial for details):
+
+- `ace_step_dit_model`: DiT executor variant — `"turbo"` (default), `"turbo-shift1"`, `"turbo-shift3"`, `"turbo-continuous"`, `"sft"`, `"base"`.
+- `ace_step_lm`: LM planner size when thinking mode is on — `"none"`, `"0.6B"`, `"1.7B"` (default), `"4B"`.
 
 ---
 
-## 7. Reference tracks (`/api/reference-tracks`)
+## 7. ACE-Step models (`/api/ace-step`)
+
+List available DiT/LM models and trigger downloads. **The ACE-Step 1.5 downloader is bundled** in the app (vendored `acestep15_downloader`), so all model downloads work without installing ACE-Step 1.5 separately. See [ACE-Step 1.5 Tutorial](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/Tutorial.md#dit-selection-summary).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/ace-step/models` | List DiT and LM models with `installed` status, plus `discovered_models`: all model directories found under the checkpoints folder (including custom trained models). Response includes `dit_models`, `lm_models`, `discovered_models` (id, label, path, custom), `acestep_download_available`, `checkpoints_path`. |
+| POST | `/api/ace-step/models/download` | Start download. Body: `{ "model": "turbo" | "turbo-shift1" | "sft" | "base" | "0.6B" | "1.7B" | "4B" }`. Uses bundled downloader (or `acestep-download` on PATH if not bundled). Returns `{ "ok", "model", "path" }` or `{ "error", "hint" }`. |
+| GET | `/api/ace-step/models/status` | Download progress: `{ "running", "model", "progress", "error" }`. |
+
+**Task types:** Generation accepts `taskType`: `text2music`, `cover`, `audio2audio`, `repaint`, `extend`, and (ACE-Step 1.5 Base) `lego`, `extract`, `complete`. Lego/extract/complete require the Base model and full 1.5 integration (planned).
+
+---
+
+## 8. Reference tracks (`/api/reference-tracks`)
 
 Upload and manage reference audio (for generation and library). Stored under user data `references/` and `reference_tracks.json`.
 
@@ -205,7 +224,7 @@ Upload and manage reference audio (for generation and library). Stored under use
 
 ---
 
-## 8. Search (`/api/search`)
+## 9. Search (`/api/search`)
 
 Simple local search over tracks (title/style/filename).
 
@@ -215,7 +234,7 @@ Simple local search over tracks (title/style/filename).
 
 ---
 
-## 9. Contact (`/api/contact`)
+## 10. Contact (`/api/contact`)
 
 Stub; no email or DB.
 
@@ -225,7 +244,7 @@ Stub; no email or DB.
 
 ---
 
-## 10. Audio serving (app-level)
+## 11. Audio serving (app-level)
 
 Not under `/api/`. Used for playback by the UI.
 
@@ -238,7 +257,7 @@ Paths must not contain `..` or leading `/`. Returns 400 for invalid path, 404 if
 
 ---
 
-## 11. Legacy / tools routes (root paths)
+## 12. Legacy / tools routes (root paths)
 
 Used by the bundled UI for stem splitting, voice cloning, MIDI generation, LoRA training, and model downloads. These are registered without an `/api` prefix.
 
