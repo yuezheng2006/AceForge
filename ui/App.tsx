@@ -309,39 +309,6 @@ export default function App() {
     loadSongs();
   }, [token]);
 
-  const handleRefreshLibrary = useCallback(async () => {
-    setIsRefreshingLibrary(true);
-    try {
-      await refreshSongsList();
-    } finally {
-      setIsRefreshingLibrary(false);
-    }
-  }, [refreshSongsList]);
-
-  // Refresh library when navigating to Library (picks up API-completed generations)
-  useEffect(() => {
-    if (currentView === 'library') {
-      refreshSongsList();
-    }
-  }, [currentView, refreshSongsList]);
-
-  // Periodic refresh when on Library or Create so API-completed tracks show up without leaving the view
-  const LIBRARY_REFRESH_MS = 20_000;
-  useEffect(() => {
-    if (currentView !== 'library' && currentView !== 'create') return;
-    const id = setInterval(refreshSongsList, LIBRARY_REFRESH_MS);
-    return () => clearInterval(id);
-  }, [currentView, refreshSongsList]);
-
-  // Refresh library when tab/window gains focus (e.g. user returns after an API generation in another terminal)
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refreshSongsList();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [refreshSongsList]);
-
   // Player Logic
   const getActiveQueue = (song?: Song) => {
     if (playQueue.length > 0) return playQueue;
@@ -572,6 +539,39 @@ export default function App() {
       console.error('Failed to refresh songs:', error);
     }
   }, [token]);
+
+  const handleRefreshLibrary = useCallback(async () => {
+    setIsRefreshingLibrary(true);
+    try {
+      await refreshSongsList();
+    } finally {
+      setIsRefreshingLibrary(false);
+    }
+  }, [refreshSongsList]);
+
+  // Refresh library when navigating to Library (picks up API-completed generations)
+  useEffect(() => {
+    if (currentView === 'library') {
+      refreshSongsList();
+    }
+  }, [currentView, refreshSongsList]);
+
+  // Periodic refresh when on Library or Create so API-completed tracks show up without leaving the view
+  const LIBRARY_REFRESH_MS = 20_000;
+  useEffect(() => {
+    if (currentView !== 'library' && currentView !== 'create') return;
+    const id = setInterval(refreshSongsList, LIBRARY_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [currentView, refreshSongsList]);
+
+  // Refresh library when tab/window gains focus (e.g. user returns after an API generation in another terminal)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshSongsList();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshSongsList]);
 
   // Handlers (local app: always "logged in", no auth checks)
   const handleGenerate = async (params: GenerationParams) => {
