@@ -877,6 +877,7 @@ def _run_ace_text2music(
             "batch_size": 1,
             "save_path": str(output_path),
             "debug": False,
+            "shift": 6.0,
         }
 
         # Wire up reference vs source audio per ACE-Step pipeline:

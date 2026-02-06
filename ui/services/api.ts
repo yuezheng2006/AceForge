@@ -264,6 +264,10 @@ export interface GenerationParams {
   completeTrackClasses?: string[];
   isFormatCaption?: boolean;
   outputDir?: string;
+  /** LoRA adapter: folder name (from list) or full path. Used for ACE-Step generation. */
+  loraNameOrPath?: string;
+  /** LoRA weight 0–2. Default 0.75. */
+  loraWeight?: number;
 }
 
 export interface GenerationJob {
@@ -281,6 +285,12 @@ export interface GenerationJob {
   error?: string;
 }
 
+export interface LoraAdapter {
+  name: string;
+  path: string;
+  size_bytes?: number | null;
+}
+
 export const generateApi = {
   startGeneration: (params: GenerationParams, token: string): Promise<GenerationJob> =>
     api('/api/generate', { method: 'POST', body: params, token }),
@@ -290,6 +300,10 @@ export const generateApi = {
 
   getHistory: (token: string): Promise<{ jobs: GenerationJob[] }> =>
     api('/api/generate/history', { token }),
+
+  /** List LoRA adapters (Training output and custom_lora folder). */
+  getLoraAdapters: (): Promise<{ adapters: LoraAdapter[] }> =>
+    api('/api/generate/lora_adapters'),
 
   uploadAudio: async (file: File, token: string): Promise<{ url: string; key: string }> => {
     const url = `${API_BASE}/api/generate/upload-audio`;

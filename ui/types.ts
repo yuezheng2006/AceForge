@@ -110,6 +110,8 @@ export interface GenerationParams {
   trackName?: string;
   completeTrackClasses?: string[];
   isFormatCaption?: boolean;
+  loraNameOrPath?: string;
+  loraWeight?: number;
 }
 
 export interface PlayerState {

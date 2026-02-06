@@ -250,7 +250,7 @@ export const TrainingPanel: React.FC<TrainingPanelProps> = ({ onTracksUpdated: _
         <h2 className="text-lg font-semibold">Train Custom LoRA</h2>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-        Run LoRA training on your dataset. Dataset folder must be under <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">training_datasets</code>. Use Browse to select a folder.
+        Run LoRA training on your dataset. Dataset folder must be under <code className="bg-zinc-200 dark:bg-zinc-700 px-1 rounded">training_datasets</code>. Use Browse to select a folder. When training finishes, the LoRA is saved automatically and will appear in <strong>Create → LoRA adapter</strong> (click Refresh there if needed).
       </p>
 
       {aceReady === false && aceState !== 'downloading' && (

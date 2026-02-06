@@ -12,6 +12,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
 
 from cdmf_paths import get_output_dir, get_user_data_dir
+from cdmf_tracks import list_lora_adapters
 
 bp = Blueprint("api_generate", __name__)
 
@@ -103,17 +104,16 @@ def _run_generation(job_id: str) -> None:
             duration = 60
         # UI may send duration=-1 or 0; clamp to valid range (15–240s)
         duration = max(15, min(240, duration))
+        # Guide: 65 steps + CFG 4.0 for best quality; low CFG reduces artifacts (see community guide).
         try:
-            steps = int(params.get("inferenceSteps") or 55)
+            steps = int(params.get("inferenceSteps") or 65)
         except (TypeError, ValueError):
-            steps = 55
+            steps = 65
         steps = max(1, min(100, steps))
-        # Doc recommends 7.0 default; higher helps adherence to caption and reference (see ACE-Step-INFERENCE.md).
         try:
-            guidance_default = 7.0 if src_audio_path else 6.0
-            guidance_scale = float(params.get("guidanceScale") or guidance_default)
+            guidance_scale = float(params.get("guidanceScale") or 4.0)
         except (TypeError, ValueError):
-            guidance_scale = 7.0 if src_audio_path else 6.0
+            guidance_scale = 4.0
         try:
             seed = int(params.get("seed") or 0)
         except (TypeError, ValueError):
@@ -159,6 +159,14 @@ def _run_generation(job_id: str) -> None:
             repaint_end = -1.0
         # -1 means "end of audio"; generate_track_ace converts to target duration
 
+        # LoRA adapter (optional): path or folder name under custom_lora
+        lora_name_or_path = (params.get("loraNameOrPath") or params.get("lora_name_or_path") or "").strip()
+        try:
+            lora_weight = float(params.get("loraWeight") or params.get("lora_weight") or 0.75)
+        except (TypeError, ValueError):
+            lora_weight = 0.75
+        lora_weight = max(0.0, min(2.0, lora_weight))
+
         if src_audio_path:
             logging.info("[API generate] Using reference audio: %s (task=%s, audio2audio=%s)", src_audio_path, task, audio2audio_enable)
         else:
@@ -193,6 +201,8 @@ def _run_generation(job_id: str) -> None:
             repaint_end=repaint_end,
             vocal_gain_db=0.0,
             instrumental_gain_db=0.0,
+            lora_name_or_path=lora_name_or_path or None,
+            lora_weight=lora_weight,
         )
 
         wav_path = summary.get("wav_path")
@@ -232,6 +242,17 @@ def _run_generation(job_id: str) -> None:
                 if j and j.get("status") == "queued":
                     threading.Thread(target=_run_generation, args=(jid,), daemon=True).start()
                     break
+
+
+@bp.route("/lora_adapters", methods=["GET"])
+def get_lora_adapters():
+    """GET /api/generate/lora_adapters — list LoRA adapters (e.g. from Training or custom_lora)."""
+    try:
+        adapters = list_lora_adapters()
+        return jsonify({"adapters": adapters})
+    except Exception as e:
+        logging.exception("[API generate] list_lora_adapters failed: %s", e)
+        return jsonify({"adapters": []})
 
 
 @bp.route("", methods=["POST"], strict_slashes=False)

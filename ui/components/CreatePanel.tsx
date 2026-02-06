@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Info } from 'lucide-react';
+import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Info, Loader2 } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { generateApi } from '../services/api';
+import { generateApi, type LoraAdapter } from '../services/api';
 
 interface ReferenceTrack {
   id: string;
@@ -142,12 +142,12 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [duration, setDuration] = useState(-1);
   const [batchSize, setBatchSize] = useState(1);
   const [bulkCount, setBulkCount] = useState(1); // Number of independent generation jobs to queue
-  const [guidanceScale, setGuidanceScale] = useState(7.0);
+  const [guidanceScale, setGuidanceScale] = useState(4.0);
   const [randomSeed, setRandomSeed] = useState(true);
   const [seed, setSeed] = useState(-1);
   const [thinking, setThinking] = useState(false); // Default false for GPU compatibility
   const [audioFormat, setAudioFormat] = useState<'mp3' | 'flac'>('mp3');
-  const [inferenceSteps, setInferenceSteps] = useState(8);
+  const [inferenceSteps, setInferenceSteps] = useState(65);
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [shift, setShift] = useState(3.0);
 
@@ -171,6 +171,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [cfgIntervalStart, setCfgIntervalStart] = useState(0.0);
   const [cfgIntervalEnd, setCfgIntervalEnd] = useState(1.0);
   const [customTimesteps, setCustomTimesteps] = useState('');
+  const [loraAdapters, setLoraAdapters] = useState<LoraAdapter[]>([]);
+  const [loraLoading, setLoraLoading] = useState(false);
+  const [loraNameOrPath, setLoraNameOrPath] = useState('');
+  const [loraWeight, setLoraWeight] = useState(0.75);
   const [useCotMetas, setUseCotMetas] = useState(true);
   const [useCotCaption, setUseCotCaption] = useState(true);
   const [useCotLanguage, setUseCotLanguage] = useState(true);
@@ -248,6 +252,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       setTaskType('text2music');
     }
   }, [referenceAudioUrl, sourceAudioUrl]);
+
+  const fetchLoraAdapters = useCallback(() => {
+    setLoraLoading(true);
+    generateApi.getLoraAdapters()
+      .then((res) => setLoraAdapters(res.adapters || []))
+      .catch(() => setLoraAdapters([]))
+      .finally(() => setLoraLoading(false));
+  }, []);
+
+  // Fetch LoRA adapters on mount (Training output + custom_lora)
+  useEffect(() => { fetchLoraAdapters(); }, [fetchLoraAdapters]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -629,6 +644,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         cfgIntervalStart,
         cfgIntervalEnd,
         customTimesteps: customTimesteps.trim() || undefined,
+        loraNameOrPath: loraNameOrPath.trim() || undefined,
+        loraWeight,
         useCotMetas,
         useCotCaption,
         useCotLanguage,
@@ -1373,7 +1390,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5">
                   <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Inference Steps</label>
-                  <InfoTooltip text="Number of denoising steps. Turbo: 1–20 (8 recommended). More steps = better quality, slower." />
+                  <InfoTooltip text="Number of denoising steps. 65 recommended for quality (low CFG + high steps). Turbo: 8–20." />
                 </span>
                 <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{inferenceSteps}</span>
               </div>
@@ -1386,7 +1403,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 onChange={(e) => setInferenceSteps(Number(e.target.value))}
                 className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
               />
-              <p className="text-[10px] text-zinc-500">More steps = better quality, slower (8 recommended for turbo)</p>
+              <p className="text-[10px] text-zinc-500">65 recommended for quality; more steps = slower</p>
             </div>
 
             {/* Guidance Scale */}
@@ -1439,6 +1456,50 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   <option value="ode">ODE (deterministic)</option>
                   <option value="sde">SDE (stochastic)</option>
                 </select>
+              </div>
+            </div>
+
+            {/* LoRA adapter (Training / custom_lora) */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">LoRA adapter</label>
+                  <InfoTooltip text="Use a custom LoRA (e.g. from Training). After training, click Refresh to see new adapters." />
+                  <button
+                    type="button"
+                    onClick={fetchLoraAdapters}
+                    disabled={loraLoading}
+                    className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-600 disabled:opacity-50"
+                    title="Refresh LoRA list"
+                  >
+                    {loraLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  </button>
+                </span>
+                <select
+                  value={loraNameOrPath}
+                  onChange={(e) => setLoraNameOrPath(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                >
+                  <option value="">None</option>
+                  {loraAdapters.map((a) => (
+                    <option key={a.path} value={a.path}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">LoRA weight</label>
+                  <InfoTooltip text="Strength of the LoRA (0–2). 0.75 is a good default; lower = subtler, higher = stronger style." />
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={loraWeight}
+                  onChange={(e) => setLoraWeight(Number(e.target.value))}
+                  className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
+                />
               </div>
             </div>
 
