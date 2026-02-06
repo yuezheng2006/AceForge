@@ -148,6 +148,7 @@ def _run_generation(job_id: str) -> None:
                 prompt = "instrumental background music"
         lyrics = (params.get("lyrics") or "").strip()
         instrumental = bool(params.get("instrumental", True))
+        negative_prompt_str = (params.get("negativePrompt") or params.get("negative_prompt") or "").strip()
         try:
             d = params.get("duration")
             duration = float(d if d is not None else 60)
@@ -268,7 +269,7 @@ def _run_generation(job_id: str) -> None:
             genre_prompt=prompt,
             lyrics=lyrics,
             instrumental=instrumental,
-            negative_prompt="",
+            negative_prompt=negative_prompt_str or "",
             target_seconds=duration,
             fade_in_seconds=0.5,
             fade_out_seconds=0.5,

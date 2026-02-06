@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Info, Loader2 } from 'lucide-react';
+import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Info, Loader2, Wrench } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { generateApi, type LoraAdapter } from '../services/api';
@@ -137,9 +137,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [keyScale, setKeyScale] = useState('');
   const [timeSignature, setTimeSignature] = useState('');
 
-  // Quality preset: applies steps, guidance, thinking, CoT in one click (default: Good)
-  type QualityPreset = 'fast' | 'good' | 'best' | 'custom';
-  const [qualityPreset, setQualityPreset] = useState<QualityPreset>('good');
+  // Quality preset: Basic / Great / Best (ACE-Step docs). Visible in both Simple and Advanced.
+  type QualityPreset = 'basic' | 'great' | 'best' | 'custom';
+  const [qualityPreset, setQualityPreset] = useState<QualityPreset>('great');
+
+  // Negative prompt / Exclude styles (Suno-like; shown above sliders in Simple)
+  const [negativePrompt, setNegativePrompt] = useState('');
+
+  // SUNO-like influence sliders (Simple mode): drive effective guidance/audio/creativity
+  const [weirdness, setWeirdness] = useState(50);       // 0–100: more creative/experimental
+  const [styleInfluence, setStyleInfluence] = useState(50); // 0–100: how much caption is followed
+  const [audioInfluence, setAudioInfluence] = useState(50); // 0–100: reference audio strength (when ref loaded)
 
   // Advanced Settings
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -155,16 +163,17 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [inferMethod, setInferMethod] = useState<'ode' | 'sde'>('ode');
   const [shift, setShift] = useState(3.0);
 
+  // Presets tuned from ACE-Step INFERENCE.md: Turbo 8–20 steps; Base 32–64; guidance 5–9; thinking/CoT for quality
   const applyPreset = (preset: QualityPreset) => {
     setQualityPreset(preset);
-    if (preset === 'fast') {
+    if (preset === 'basic') {
       setInferenceSteps(12);
       setGuidanceScale(4.0);
       setThinking(false);
       setUseCotMetas(false);
       setUseCotCaption(false);
       setUseCotLanguage(false);
-    } else if (preset === 'good') {
+    } else if (preset === 'great') {
       setInferenceSteps(40);
       setGuidanceScale(5.5);
       setThinking(true);
@@ -172,8 +181,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
       setUseCotCaption(true);
       setUseCotLanguage(true);
     } else if (preset === 'best') {
-      setInferenceSteps(70);
-      setGuidanceScale(7.0);
+      setInferenceSteps(75);
+      setGuidanceScale(8.0);
       setThinking(true);
       setUseCotMetas(true);
       setUseCotCaption(true);
@@ -216,8 +225,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [getLrc, setGetLrc] = useState(false);
   const [scoreScale, setScoreScale] = useState(0.5);
   const [lmBatchChunkSize, setLmBatchChunkSize] = useState(8);
-  const [trackName, setTrackName] = useState('');
-  const [completeTrackClasses, setCompleteTrackClasses] = useState('');
   const [isFormatCaption, setIsFormatCaption] = useState(false);
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
@@ -645,7 +652,15 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         jobSeed = Math.floor(Math.random() * 4294967295);
       }
 
-      onGenerate({
+      // In Simple mode, apply SUNO-like sliders to effective params (preset base + influence)
+        const hasRef = !!(referenceAudioUrl?.trim() || sourceAudioUrl?.trim());
+        const effGuidance = customMode
+          ? guidanceScale
+          : Math.max(2, Math.min(10, guidanceScale * (0.5 + styleInfluence / 100) * (1 - 0.35 * weirdness / 100)));
+        const effAudioCover = customMode || !hasRef ? audioCoverStrength : audioInfluence / 100;
+        const effLmTemp = customMode ? lmTemperature : (thinking ? 0.7 + 0.5 * (weirdness / 100) : lmTemperature);
+
+        onGenerate({
         customMode,
         songDescription: customMode ? undefined : songDescription,
         prompt: style,
@@ -659,7 +674,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         timeSignature,
         duration,
         inferenceSteps,
-        guidanceScale,
+        guidanceScale: effGuidance,
         batchSize,
         randomSeed: randomSeed || i > 0, // Force random for subsequent bulk jobs
         seed: jobSeed,
@@ -667,7 +682,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         audioFormat,
         inferMethod,
         shift,
-        lmTemperature,
+        lmTemperature: effLmTemp,
         lmCfgScale,
         lmTopK,
         lmTopP,
@@ -677,7 +692,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         audioCodes: audioCodes.trim() || undefined,
         repaintingStart,
         repaintingEnd,
-        audioCoverStrength,
+        audioCoverStrength: effAudioCover,
         taskType,
         useAdg,
         cfgIntervalStart,
@@ -695,14 +710,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         getLrc,
         scoreScale,
         lmBatchChunkSize,
-        trackName: trackName.trim() || undefined,
-        completeTrackClasses: (() => {
-          const parsed = completeTrackClasses
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
-          return parsed.length ? parsed : undefined;
-        })(),
+        negativePrompt: negativePrompt.trim() || undefined,
         isFormatCaption,
       });
     }
@@ -802,6 +810,114 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   <option key={lang.value} value={lang.value}>{lang.label}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Quality preset (Simple + Advanced) — Basic / Great / Best from ACE-Step docs */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Quality
+                <InfoTooltip text="Basic: fast, fewer steps. Great: balanced. Best: maximum quality (more steps, higher guidance, LM thinking)." />
+              </div>
+              <div className="p-3 flex gap-2">
+                {(['basic', 'great', 'best'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => applyPreset(p)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      qualityPreset === p
+                        ? 'bg-pink-600 text-white'
+                        : 'bg-zinc-100 dark:bg-black/30 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {p === 'basic' ? 'Basic' : p === 'great' ? 'Great' : 'Best'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Exclude styles (Suno-like negative prompt) — right above sliders */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 flex items-center gap-2">
+                <Wrench size={14} className="text-zinc-500 dark:text-zinc-400 shrink-0" />
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Exclude styles</label>
+                <InfoTooltip text="Things to avoid in the output (e.g. genres, instruments, mood). Added as negative guidance." />
+              </div>
+              <input
+                type="text"
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                placeholder="e.g. heavy distortion, screaming"
+                className="w-full bg-transparent px-3 pb-3 pt-0 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none border-0"
+              />
+            </div>
+
+            {/* SUNO-like influence sliders (Simple): Weirdness, Style Influence, Audio Influence */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
+              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
+                <Sliders size={14} />
+                Generation influence
+              </h3>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Fine-tune how the model follows your description and reference (if any).</p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Weirdness</label>
+                    <InfoTooltip text="Higher = more creative/experimental; lower = more predictable and on-prompt." />
+                  </span>
+                  <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{weirdness}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={weirdness}
+                  onChange={(e) => setWeirdness(Number(e.target.value))}
+                  className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Style influence</label>
+                    <InfoTooltip text="How strongly the style/caption is followed. Higher = closer to your description." />
+                  </span>
+                  <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{styleInfluence}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={styleInfluence}
+                  onChange={(e) => setStyleInfluence(Number(e.target.value))}
+                  className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                />
+              </div>
+
+              {(referenceAudioUrl?.trim() || sourceAudioUrl?.trim()) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5">
+                      <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Audio influence</label>
+                      <InfoTooltip text="How much the reference/cover audio influences the result. Higher = stronger reference style." />
+                    </span>
+                    <span className="text-xs font-mono text-zinc-900 dark:text-white bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded">{audioInfluence}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={audioInfluence}
+                    onChange={(e) => setAudioInfluence(Number(e.target.value))}
+                    className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Quick Settings (Simple Mode) */}
@@ -1348,6 +1464,21 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
             <p className="text-[11px] text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 pb-2">Common to all modes: duration, steps, guidance, seed.</p>
 
+            {/* Exclude styles (negative prompt) — same as Simple, for Custom mode */}
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5">
+                <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Exclude styles</label>
+                <InfoTooltip text="Things to avoid in the output (e.g. genres, instruments). Added as negative guidance." />
+              </span>
+              <input
+                type="text"
+                value={negativePrompt}
+                onChange={(e) => setNegativePrompt(e.target.value)}
+                placeholder="e.g. heavy distortion, screaming"
+                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
+              />
+            </div>
+
             {/* Duration */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1428,16 +1559,16 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             <div className="space-y-2">
               <span className="inline-flex gap-1.5">
                 <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Quality preset</label>
-                <InfoTooltip text="Fast: ~12 steps, no Thinking. Good: ~40 steps + Thinking/CoT. Best: ~70 steps + full CoT. Custom: use sliders below." />
+                <InfoTooltip text="Basic: ~12 steps, no Thinking. Great: ~40 steps + Thinking/CoT. Best: max quality (~75 steps, guidance 8, full CoT). Custom: use sliders below." />
               </span>
               <select
                 value={qualityPreset}
                 onChange={(e) => applyPreset(e.target.value as QualityPreset)}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none"
               >
-                <option value="fast">Fast — fewer steps, no LM</option>
-                <option value="good">Good — balanced (steps + Thinking)</option>
-                <option value="best">Best — max quality (steps + full CoT)</option>
+                <option value="basic">Basic — fast, fewer steps</option>
+                <option value="great">Great — balanced quality</option>
+                <option value="best">Best — maximum quality</option>
                 <option value="custom">Custom — use sliders only</option>
               </select>
               <p className="text-[10px] text-zinc-500">Preset updates steps, guidance, and Thinking/CoT below</p>
@@ -1936,28 +2067,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 />
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Track Name</label>
-              <input
-                type="text"
-                value={trackName}
-                onChange={(e) => setTrackName(e.target.value)}
-                placeholder="Optional track name"
-                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Complete Track Classes</label>
-              <input
-                type="text"
-                value={completeTrackClasses}
-                onChange={(e) => setCompleteTrackClasses(e.target.value)}
-                placeholder="class-a, class-b"
-                className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-xs text-zinc-900 dark:text-white focus:outline-none"
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

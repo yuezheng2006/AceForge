@@ -73,6 +73,7 @@ export interface GenerationParams {
   inferenceSteps: number;
   guidanceScale: number;
   batchSize: number;
+  negativePrompt?: string; // Exclude styles / what to avoid (Suno-like)
   randomSeed: boolean;
   seed: number;
   thinking: boolean;
@@ -110,8 +111,6 @@ export interface GenerationParams {
   getLrc?: boolean;
   scoreScale?: number;
   lmBatchChunkSize?: number;
-  trackName?: string;
-  completeTrackClasses?: string[];
   isFormatCaption?: boolean;
   loraNameOrPath?: string;
   loraWeight?: number;
