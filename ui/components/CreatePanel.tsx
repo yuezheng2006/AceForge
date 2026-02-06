@@ -693,7 +693,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         repaintingStart,
         repaintingEnd,
         audioCoverStrength: effAudioCover,
-        taskType,
+        taskType: customMode ? taskType : (sourceAudioUrl?.trim() ? 'cover' : 'text2music'),
         useAdg,
         cfgIntervalStart,
         cfgIntervalEnd,
@@ -783,6 +783,20 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         {/* SIMPLE MODE */}
         {!customMode && (
           <div className="space-y-5">
+            {/* Title (same as Custom mode) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                Title
+              </div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Name your song"
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
+              />
+            </div>
+
             {/* Song Description */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
               <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
@@ -918,6 +932,42 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                   />
                 </div>
               )}
+            </div>
+
+            {/* Reference & cover (optional) — same as Custom but compact; no hidden features */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-3">
+              <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Reference & cover (optional)</h3>
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Use a style reference or a song to cover. Leave empty to generate from your description only.</p>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Reference style</span>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => openAudioModal('reference')} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                        Library
+                      </button>
+                      <button type="button" onClick={() => referenceInputRef.current?.click()} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                  {referenceAudioUrl ? <p className="text-[11px] text-pink-600 dark:text-pink-400 truncate" title={referenceAudioUrl}>Reference: {getAudioLabel(referenceAudioUrl)}</p> : <p className="text-[11px] text-zinc-400 italic">None</p>}
+                </div>
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Song to cover</span>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => openAudioModal('source')} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                        Library
+                      </button>
+                      <button type="button" onClick={() => sourceInputRef.current?.click()} className="flex items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                        Upload
+                      </button>
+                    </div>
+                  </div>
+                  {sourceAudioUrl ? <p className="text-[11px] text-emerald-600 dark:text-emerald-400 truncate" title={sourceAudioUrl}>Cover: {getAudioLabel(sourceAudioUrl)}</p> : <p className="text-[11px] text-zinc-400 italic">None</p>}
+                </div>
+              </div>
             </div>
 
             {/* Quick Settings (Simple Mode) */}
@@ -1377,7 +1427,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
         </div>
 
-        {/* MUSIC PARAMETERS */}
+        {/* MUSIC PARAMETERS — Custom mode only (Simple has these in Quick Settings) */}
+        {customMode && (
         <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4 space-y-4">
           <h3 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide flex items-center gap-2">
             <Sliders size={14} />
@@ -1446,8 +1497,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             </div>
           </div>
         </div>
+        )}
 
-        {/* ADVANCED SETTINGS */}
+        {/* ADVANCED SETTINGS — Custom mode only; Simple has no advanced section */}
+        {customMode && (
+        <>
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
@@ -2112,6 +2166,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </label>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
 

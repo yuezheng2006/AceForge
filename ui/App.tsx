@@ -671,8 +671,6 @@ export default function App() {
         getLrc: params.getLrc,
         scoreScale: params.scoreScale,
         lmBatchChunkSize: params.lmBatchChunkSize,
-        trackName: params.trackName,
-        completeTrackClasses: params.completeTrackClasses,
         isFormatCaption: params.isFormatCaption,
         ...(prefs.output_dir ? { outputDir: prefs.output_dir } : {}),
       };

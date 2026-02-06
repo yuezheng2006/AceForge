@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
 
 from cdmf_paths import get_output_dir, get_user_data_dir, load_config
-from cdmf_tracks import list_lora_adapters
+from cdmf_tracks import list_lora_adapters, load_track_meta, save_track_meta
 from cdmf_generation_job import GenerationCancelled
 import cdmf_state
 from generate_ace import register_job_progress_callback
@@ -310,6 +310,30 @@ def _run_generation(job_id: str) -> None:
         filename = path.name
         audio_url = f"/audio/{filename}"
         actual_seconds = float(summary.get("actual_seconds") or duration)
+
+        # Save title, lyrics, style to track metadata so they appear in the library (input params only; model does not return lyrics)
+        try:
+            meta = load_track_meta()
+            job_title = (params.get("title") or "Untitled").strip() or "Track"
+            job_lyrics = (params.get("lyrics") or "").strip()
+            job_style = (params.get("style") or params.get("songDescription") or "").strip()
+            entry = meta.get(filename, {})
+            entry["title"] = job_title[:500]
+            entry["lyrics"] = job_lyrics[:10000]
+            entry["style"] = job_style[:500] if job_style else job_title[:500]
+            entry["caption"] = entry["style"]
+            entry["seconds"] = actual_seconds
+            entry["created"] = time.time()
+            if bpm is not None:
+                entry["bpm"] = bpm
+            if params.get("keyScale"):
+                entry["key_scale"] = str(params.get("keyScale"))[:100]
+            if params.get("timeSignature"):
+                entry["time_signature"] = str(params.get("timeSignature"))[:50]
+            meta[filename] = entry
+            save_track_meta(meta)
+        except Exception as meta_err:
+            logging.warning("[API generate] Failed to save track metadata: %s", meta_err)
 
         with _jobs_lock:
             job = _jobs.get(job_id)

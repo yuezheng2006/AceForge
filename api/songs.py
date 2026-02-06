@@ -59,7 +59,7 @@ def _song_from_filename(name: str, meta: dict) -> dict:
     audio_url = f"/audio/{name}"
     return {
         "id": _filename_to_id(name),
-        "title": stem,
+        "title": (info.get("title") or "").strip() or stem,
         "lyrics": info.get("lyrics") or "",
         "style": info.get("style") or stem,
         "caption": info.get("caption") or stem,
