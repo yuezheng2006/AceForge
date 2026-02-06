@@ -770,6 +770,7 @@ def _run_ace_text2music(
     ref_audio_strength: float = 0.7,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
+    cancel_check: Optional[Callable[[], bool]] = None,
 ) -> None:
     """
     Call ACE-Step Text2Music and render a single track into ``output_path``.
@@ -879,6 +880,8 @@ def _run_ace_text2music(
             "debug": False,
             "shift": 6.0,
         }
+        if cancel_check is not None:
+            call_kwargs["cancel_check"] = cancel_check
 
         # Wire up reference vs source audio per ACE-Step pipeline:
         #
@@ -1033,6 +1036,7 @@ def generate_track_ace(
     src_audio_path: str | None = None,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
+    cancel_check: Optional[Callable[[], bool]] = None,
 ) -> Dict[str, Any]:
     """
     High-level wrapper for the Flask UI.
@@ -1161,6 +1165,7 @@ def generate_track_ace(
         ref_audio_strength=float(ref_audio_strength),
         lora_name_or_path=lora_name_or_path,
         lora_weight=float(lora_weight),
+        cancel_check=cancel_check,
     )
 
     _report_progress(0.90, "fades")

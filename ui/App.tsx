@@ -51,6 +51,7 @@ export default function App() {
   const [likedSongIds, setLikedSongIds] = useState<Set<string>>(new Set());
   const [playQueue, setPlayQueue] = useState<Song[]>([]);
   const [queueIndex, setQueueIndex] = useState(-1);
+  const [isRefreshingLibrary, setIsRefreshingLibrary] = useState(false);
 
   // Selection State
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -307,6 +308,39 @@ export default function App() {
 
     loadSongs();
   }, [token]);
+
+  const handleRefreshLibrary = useCallback(async () => {
+    setIsRefreshingLibrary(true);
+    try {
+      await refreshSongsList();
+    } finally {
+      setIsRefreshingLibrary(false);
+    }
+  }, [refreshSongsList]);
+
+  // Refresh library when navigating to Library (picks up API-completed generations)
+  useEffect(() => {
+    if (currentView === 'library') {
+      refreshSongsList();
+    }
+  }, [currentView, refreshSongsList]);
+
+  // Periodic refresh when on Library or Create so API-completed tracks show up without leaving the view
+  const LIBRARY_REFRESH_MS = 20_000;
+  useEffect(() => {
+    if (currentView !== 'library' && currentView !== 'create') return;
+    const id = setInterval(refreshSongsList, LIBRARY_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [currentView, refreshSongsList]);
+
+  // Refresh library when tab/window gains focus (e.g. user returns after an API generation in another terminal)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshSongsList();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshSongsList]);
 
   // Player Logic
   const getActiveQueue = (song?: Song) => {
@@ -883,6 +917,8 @@ export default function App() {
               setIsCreatePlaylistModalOpen(true);
             }}
             onSelectPlaylist={(p) => handleNavigateToPlaylist(p.id)}
+            onRefreshLibrary={handleRefreshLibrary}
+            isRefreshingLibrary={isRefreshingLibrary}
           />
         );
 

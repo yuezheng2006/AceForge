@@ -189,6 +189,36 @@ def test_generate_status_not_found(app_client):
     assert r.status_code == 404
 
 
+def test_generate_cancel_not_found(app_client):
+    r = app_client.post("/api/generate/cancel/nonexistent-uuid")
+    assert r.status_code == 404
+
+
+def test_generate_cancel_queued(app_client):
+    # Create a minimal job then cancel it. If still queued, status becomes cancelled; if already running, cancel is requested.
+    r = app_client.post(
+        "/api/generate/",
+        data=json.dumps({
+            "customMode": True,
+            "style": "test cancel",
+            "duration": 30,
+            "instrumental": True,
+        }),
+        content_type="application/json",
+    )
+    assert r.status_code == 200
+    job_id = r.get_json()["jobId"]
+    r2 = app_client.post(f"/api/generate/cancel/{job_id}")
+    assert r2.status_code == 200
+    data = r2.get_json()
+    assert data.get("cancelled") is True
+    assert data.get("jobId") == job_id
+    # Queued jobs become cancelled immediately; running jobs get cancel requested and become cancelled after current step
+    r3 = app_client.get(f"/api/generate/status/{job_id}")
+    assert r3.status_code == 200
+    assert r3.get_json().get("status") in ("cancelled", "running")
+
+
 def test_generate_audio_query_required(app_client):
     r = app_client.get("/api/generate/audio")
     assert r.status_code == 400

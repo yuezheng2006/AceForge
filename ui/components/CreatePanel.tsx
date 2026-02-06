@@ -440,6 +440,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     }
   }, [token]);
 
+  // Refresh library list periodically so API-completed generations show up in "From library"
+  useEffect(() => {
+    void fetchReferenceTracks();
+    const REFRESH_MS = 20_000;
+    const id = setInterval(() => fetchReferenceTracks(), REFRESH_MS);
+    return () => clearInterval(id);
+  }, [fetchReferenceTracks]);
+
   const uploadReferenceTrack = async (file: File) => {
     setUploadError(null);
     setIsUploadingReference(true);
@@ -2012,10 +2020,22 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
             {/* Library + Ref uploads: tag filter and track list */}
             <div className="border-t border-zinc-100 dark:border-white/5">
               <div className="px-5 py-3 flex items-center justify-between gap-2 flex-wrap">
-                <span className="px-3 py-1 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold">
-                  Library & uploads
-                </span>
-                <span className="text-[11px] text-zinc-400">(local)</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-xs font-semibold">
+                    Library & uploads
+                  </span>
+                  <span className="text-[11px] text-zinc-400">(local)</span>
+                  <button
+                    type="button"
+                    onClick={() => void fetchReferenceTracks()}
+                    disabled={isLoadingTracks}
+                    className="p-1 rounded text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-50"
+                    title="Refresh library (e.g. after API generations)"
+                    aria-label="Refresh library"
+                  >
+                    <RefreshCw size={14} className={isLoadingTracks ? 'animate-spin' : ''} />
+                  </button>
+                </div>
                 {referenceTracks.length > 0 && (() => {
                   const allTags = Array.from(new Set(referenceTracks.flatMap(t => t.tags || []))).filter(Boolean).sort();
                   return (

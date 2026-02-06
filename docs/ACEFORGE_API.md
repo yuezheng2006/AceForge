@@ -106,6 +106,8 @@ ACE-Step text-to-music (and related tasks). Jobs are queued and run one at a tim
 |--------|------|-------------|
 | POST | `/api/generate` | Start a generation job. Returns `jobId`, `status`, `queuePosition`. |
 | GET | `/api/generate/status/<job_id>` | Job status and result when done |
+| POST | `/api/generate/cancel/<job_id>` | Cancel a queued or running job. Queued jobs are removed; running jobs stop after the current step. Returns `{ "cancelled", "jobId", "message" }`. |
+| GET | `/api/generate/lora_adapters` | List LoRA adapters (Training output and custom_lora folder). Response: `{ "adapters": [ { "name", "path", "size_bytes"? } ] }`. |
 | POST | `/api/generate/upload-audio` | Upload audio (multipart form field `audio`). Saves to references dir and library. Returns `{ "url", "key" }`. |
 | GET | `/api/generate/audio` | Query: `?path=...`. Serve file from output or references dir. |
 | GET | `/api/generate/history` | Last 50 jobs. Response: `{ "jobs": [ ... ] }` |
@@ -130,10 +132,14 @@ ACE-Step text-to-music (and related tasks). Jobs are queued and run one at a tim
 - `title`: base name for output file.
 - `outputDir` / `output_dir`: optional; else uses app default.
 - `keyScale`, `timeSignature`, `vocalLanguage`, `bpm`: optional.
+- `loraNameOrPath`: optional; folder name from LoRA list or path to adapter (see `GET /api/generate/lora_adapters`).
+- `loraWeight`: optional; 0–2, default 0.75.
 
 **Response (POST):** `{ "jobId": "<uuid>", "status": "queued", "queuePosition": 1 }`
 
-**Status response:** `{ "jobId", "status": "queued"|"running"|"succeeded"|"failed", "queuePosition"?, "etaSeconds"?, "result"?, "error"? }`. On success, `result` includes e.g. `audioUrls`, `duration`, `status`.
+**Status response:** `{ "jobId", "status": "queued"|"running"|"succeeded"|"failed"|"cancelled", "queuePosition"?, "etaSeconds"?, "result"?, "error"? }`. On success, `result` includes e.g. `audioUrls`, `duration`, `status`. Cancelled jobs have `status: "cancelled"` and `error: "Cancelled by user"`.
+
+**Cancel response (POST /api/generate/cancel/<job_id>):** `{ "cancelled": true|false, "jobId": "<id>", "message": "..." }`. For queued jobs the job is removed immediately; for running jobs the worker stops after the current inference step and the job status becomes `cancelled`.
 
 ---
 

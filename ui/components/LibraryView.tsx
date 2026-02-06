@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Song, Playlist } from '../types';
-import { Heart, Plus, Music, Play } from 'lucide-react';
+import { Heart, Plus, Music, Play, RefreshCw } from 'lucide-react';
 import { AlbumCover } from './AlbumCover';
 
 interface LibraryViewProps {
@@ -9,14 +9,18 @@ interface LibraryViewProps {
   onPlaySong: (song: Song, list?: Song[]) => void;
   onCreatePlaylist: () => void;
   onSelectPlaylist: (playlist: Playlist) => void;
+  onRefreshLibrary?: () => void;
+  isRefreshingLibrary?: boolean;
 }
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ 
-    likedSongs, 
-    playlists, 
-    onPlaySong, 
+export const LibraryView: React.FC<LibraryViewProps> = ({
+    likedSongs,
+    playlists,
+    onPlaySong,
     onCreatePlaylist,
-    onSelectPlaylist 
+    onSelectPlaylist,
+    onRefreshLibrary,
+    isRefreshingLibrary = false,
 }) => {
     const [activeTab, setActiveTab] = useState<'playlists' | 'liked'>('liked');
 
@@ -24,13 +28,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         <div className="flex-1 bg-white dark:bg-black overflow-y-auto custom-scrollbar p-6 lg:p-10 pb-32 transition-colors duration-300">
              <div className="flex items-center justify-between mb-8">
                 <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">Your Library</h1>
-                <button 
+                <div className="flex items-center gap-2">
+                  {onRefreshLibrary && (
+                    <button
+                      type="button"
+                      onClick={onRefreshLibrary}
+                      disabled={isRefreshingLibrary}
+                      className="p-2 rounded-full text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-50 transition-colors"
+                      title="Refresh library (e.g. after API generations)"
+                      aria-label="Refresh library"
+                    >
+                      <RefreshCw size={20} className={isRefreshingLibrary ? 'animate-spin' : ''} />
+                    </button>
+                  )}
+                  <button 
                     onClick={onCreatePlaylist}
                     className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-800 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-lg shadow-zinc-900/10 dark:shadow-none"
-                >
+                  >
                     <Plus size={18} />
                     <span>New Playlist</span>
-                </button>
+                  </button>
+                </div>
              </div>
 
              {/* Tabs */}

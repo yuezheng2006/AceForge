@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request, send_file
 
 from cdmf_paths import get_output_dir, get_user_data_dir
 from cdmf_tracks import list_lora_adapters
+from cdmf_generation_job import GenerationCancelled
 
 bp = Blueprint("api_generate", __name__)
 
@@ -23,6 +24,15 @@ _jobs_lock = threading.Lock()
 _job_order: list = []
 # One worker at a time (must use 'global _generation_busy' in any function that assigns to it)
 _generation_busy = False
+# Current running job id (for cancel); set by worker, read by cancel endpoint
+_current_job_id: str | None = None
+# Job ids for which cancel was requested (cooperative stop)
+_cancel_requested: set = set()
+
+
+def _is_cancel_requested(job_id: str) -> bool:
+    with _jobs_lock:
+        return job_id in _cancel_requested
 
 
 def _refs_dir() -> Path:
@@ -56,13 +66,15 @@ def _resolve_audio_url_to_path(url: str) -> str | None:
 
 def _run_generation(job_id: str) -> None:
     """Background: run generate_track_ace and update job."""
-    global _generation_busy
+    global _generation_busy, _current_job_id
     with _jobs_lock:
         job = _jobs.get(job_id)
         if not job or job.get("status") != "queued":
             return
         job["status"] = "running"
+        _current_job_id = job_id
 
+    cancel_check = lambda: _is_cancel_requested(job_id)
     try:
         from generate_ace import generate_track_ace
 
@@ -203,6 +215,7 @@ def _run_generation(job_id: str) -> None:
             instrumental_gain_db=0.0,
             lora_name_or_path=lora_name_or_path or None,
             lora_weight=lora_weight,
+            cancel_check=cancel_check,
         )
 
         wav_path = summary.get("wav_path")
@@ -226,6 +239,13 @@ def _run_generation(job_id: str) -> None:
                     "timeSignature": params.get("timeSignature"),
                     "status": "succeeded",
                 }
+    except GenerationCancelled:
+        logging.info("Generation job %s cancelled by user", job_id)
+        with _jobs_lock:
+            job = _jobs.get(job_id)
+            if job:
+                job["status"] = "cancelled"
+                job["error"] = "Cancelled by user"
     except Exception as e:
         logging.exception("Generation job %s failed", job_id)
         with _jobs_lock:
@@ -235,7 +255,10 @@ def _run_generation(job_id: str) -> None:
                 job["error"] = str(e)
     finally:
         _generation_busy = False
-        # Start next queued job
+        with _jobs_lock:
+            _current_job_id = None
+            _cancel_requested.discard(job_id)
+        # Start next queued job (skips cancelled: they are no longer "queued")
         with _jobs_lock:
             for jid in _job_order:
                 j = _jobs.get(jid)
@@ -328,6 +351,25 @@ def get_status(job_id: str):
         "error": job.get("error"),
     }
     return jsonify(out)
+
+
+@bp.route("/cancel/<job_id>", methods=["POST"])
+def cancel_job(job_id: str):
+    """POST /api/generate/cancel/:jobId — cancel a queued or running generation job."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        status = job.get("status", "unknown")
+        if status == "queued":
+            job["status"] = "cancelled"
+            job["error"] = "Cancelled by user"
+            return jsonify({"cancelled": True, "jobId": job_id, "message": "Job removed from queue."})
+        if status == "running":
+            _cancel_requested.add(job_id)
+            return jsonify({"cancelled": True, "jobId": job_id, "message": "Cancel requested; generation will stop after the current step."})
+        # already succeeded, failed, or cancelled
+        return jsonify({"cancelled": False, "jobId": job_id, "message": f"Job already {status}."})
 
 
 def _reference_tracks_meta_path() -> Path:
