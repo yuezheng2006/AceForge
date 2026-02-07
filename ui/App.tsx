@@ -399,16 +399,32 @@ export default function App() {
       pendingSeekRef.current = null;
     };
 
+    const updateDurationFromAudio = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0 && !Number.isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      } else if (audio.seekable.length > 0) {
+        const end = audio.seekable.end(audio.seekable.length - 1);
+        if (Number.isFinite(end) && end > 0) setDuration(end);
+      }
+    };
+
     const onLoadedMetadata = () => {
-      setDuration(audio.duration);
+      updateDurationFromAudio();
+      applyPendingSeek();
+    };
+
+    const onDurationChange = () => {
+      updateDurationFromAudio();
       applyPendingSeek();
     };
 
     const onCanPlay = () => {
+      updateDurationFromAudio();
       applyPendingSeek();
     };
 
     const onProgress = () => {
+      updateDurationFromAudio();
       applyPendingSeek();
     };
 
@@ -430,6 +446,7 @@ export default function App() {
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('durationchange', onDurationChange);
     audio.addEventListener('canplay', onCanPlay);
     audio.addEventListener('progress', onProgress);
     audio.addEventListener('ended', onEnded);
@@ -439,6 +456,7 @@ export default function App() {
       audio.pause();
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('durationchange', onDurationChange);
       audio.removeEventListener('canplay', onCanPlay);
       audio.removeEventListener('progress', onProgress);
       audio.removeEventListener('ended', onEnded);
@@ -466,6 +484,9 @@ export default function App() {
     };
 
     if (audio.src !== currentSong.audioUrl) {
+      setCurrentTime(0);
+      setDuration(0);
+      pendingSeekRef.current = null;
       audio.src = currentSong.audioUrl;
       audio.load();
       if (isPlaying) playAudio();
@@ -650,8 +671,6 @@ export default function App() {
         getLrc: params.getLrc,
         scoreScale: params.scoreScale,
         lmBatchChunkSize: params.lmBatchChunkSize,
-        trackName: params.trackName,
-        completeTrackClasses: params.completeTrackClasses,
         isFormatCaption: params.isFormatCaption,
         ...(prefs.output_dir ? { outputDir: prefs.output_dir } : {}),
       };
@@ -663,12 +682,15 @@ export default function App() {
         try {
           const status = await generateApi.getStatus(job.jobId, token ?? '');
 
-          // Update queue position on the temp song
+          // Update queue position and progress on the temp song
           setSongs(prev => prev.map(s => {
             if (s.id === tempId) {
               return {
                 ...s,
                 queuePosition: status.status === 'queued' ? status.queuePosition : undefined,
+                generationPercent: status.status === 'running' ? status.progressPercent : undefined,
+                generationSteps: status.status === 'running' ? status.progressSteps : undefined,
+                generationEtaSeconds: status.status === 'running' && status.etaSeconds != null ? status.etaSeconds : undefined,
               };
             }
             return s;
@@ -751,12 +773,24 @@ export default function App() {
   const handleSeek = (time: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (Number.isNaN(audio.duration) || audio.readyState < 1 || audio.seekable.length === 0) {
-      pendingSeekRef.current = time;
+    const seekableEnd = audio.seekable.length > 0 ? audio.seekable.end(audio.seekable.length - 1) : 0;
+    const effectiveDuration = Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : seekableEnd;
+    const target = Math.max(0, effectiveDuration > 0 ? Math.min(time, effectiveDuration) : time);
+    if (audio.readyState < 1) {
+      pendingSeekRef.current = target;
       return;
     }
-    audio.currentTime = time;
-    setCurrentTime(time);
+    if (audio.seekable.length === 0) {
+      pendingSeekRef.current = target;
+      audio.currentTime = target;
+      setCurrentTime(target);
+      return;
+    }
+    audio.currentTime = target;
+    setCurrentTime(target);
+    pendingSeekRef.current = null;
   };
 
   const toggleLike = async (songId: string) => {

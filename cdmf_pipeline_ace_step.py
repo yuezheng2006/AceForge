@@ -314,6 +314,52 @@ def _check_required_imports():
     raise ImportError(error_message)
 
 
+def _refine_prompt_with_lm(
+    lm_checkpoint_path,
+    prompt,
+    lyrics,
+    use_cot_metas=True,
+    use_cot_caption=True,
+    use_cot_language=True,
+    lm_temperature=0.85,
+    lm_cfg_scale=2.0,
+    lm_top_k=0,
+    lm_top_p=0.9,
+    lm_negative_prompt="NO USER INPUT",
+):
+    """
+    Optionally refine prompt/lyrics using the bundled ACE-Step 5Hz LM (no external LLM).
+    Returns (refined_prompt, refined_lyrics) or None if LM inference is not available.
+    """
+    try:
+        # ACE-Step 1.5 may expose LLMHandler and format_sample / create_sample
+        from acestep.llm_inference import LLMHandler
+        from acestep.inference import format_sample
+    except ImportError:
+        return None
+    try:
+        llm = LLMHandler()
+        llm.initialize(
+            checkpoint_dir=str(lm_checkpoint_path),
+            device="cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu",
+        )
+        result = format_sample(
+            llm,
+            caption=prompt or "",
+            lyrics=lyrics or "",
+            temperature=lm_temperature,
+            top_k=lm_top_k if lm_top_k else None,
+            top_p=lm_top_p,
+        )
+        if result and getattr(result, "caption", None) is not None:
+            new_caption = getattr(result, "caption", None) or prompt
+            new_lyrics = getattr(result, "lyrics", None) if hasattr(result, "lyrics") else lyrics
+            return (new_caption, new_lyrics or lyrics)
+    except Exception:
+        pass
+    return None
+
+
 # class ACEStepPipeline(DiffusionPipeline):
 class ACEStepPipeline:
     def __init__(
@@ -778,7 +824,11 @@ class ACEStepPipeline:
             language = "en"
         return language
 
-    def tokenize_lyrics(self, lyrics, debug=False):
+    def tokenize_lyrics(self, lyrics, debug=False, vocal_language=None):
+        """
+        Tokenize lyrics. When vocal_language is set (e.g. "en", "zh"), use it for all
+        lines instead of auto-detection, so user language choice is respected.
+        """
         lines = lyrics.split("\n")
         lyric_token_idx = [261]
         for line in lines:
@@ -787,7 +837,10 @@ class ACEStepPipeline:
                 lyric_token_idx += [2]
                 continue
 
-            lang = self.get_lang(line)
+            if vocal_language and vocal_language in SUPPORT_LANGUAGES:
+                lang = vocal_language
+            else:
+                lang = self.get_lang(line)
 
             if lang not in SUPPORT_LANGUAGES:
                 lang = "en"
@@ -1891,9 +1944,45 @@ class ACEStepPipeline:
         debug: bool = False,
         shift: float = 6.0,
         cancel_check=None,
+        vocal_language: str = None,
+        # Thinking / LM / CoT (accepted for API compatibility; full LM path not yet integrated)
+        thinking: bool = False,
+        use_cot_metas: bool = True,
+        use_cot_caption: bool = True,
+        use_cot_language: bool = True,
+        lm_temperature: float = 0.85,
+        lm_cfg_scale: float = 2.0,
+        lm_top_k: int = 0,
+        lm_top_p: float = 0.9,
+        lm_negative_prompt: str = "NO USER INPUT",
+        lm_checkpoint_path: str = None,
     ):
 
         start_time = time.time()
+
+        # LM planner: optional refinement of prompt/lyrics using bundled 5Hz LM (no external LLM)
+        if thinking and lm_checkpoint_path:
+            refined = _refine_prompt_with_lm(
+                lm_checkpoint_path=lm_checkpoint_path,
+                prompt=prompt,
+                lyrics=lyrics or "",
+                use_cot_metas=use_cot_metas,
+                use_cot_caption=use_cot_caption,
+                use_cot_language=use_cot_language,
+                lm_temperature=lm_temperature,
+                lm_cfg_scale=lm_cfg_scale,
+                lm_top_k=lm_top_k,
+                lm_top_p=lm_top_p,
+                lm_negative_prompt=lm_negative_prompt,
+            )
+            if refined is not None:
+                prompt, lyrics = refined
+                if logger:
+                    logger.info("LM planner refined caption/lyrics; using for DiT.")
+        elif thinking and logger:
+            logger.info(
+                "Thinking on but no LM planner path (select an LM in Settings → Models). DiT-only."
+            )
 
         if audio2audio_enable and ref_audio_input is not None:
             task = "audio2audio"
@@ -1938,7 +2027,9 @@ class ACEStepPipeline:
         lyric_token_idx = torch.tensor([0]).repeat(batch_size, 1).to(self.device).long()
         lyric_mask = torch.tensor([0]).repeat(batch_size, 1).to(self.device).long()
         if len(lyrics) > 0:
-            lyric_token_idx = self.tokenize_lyrics(lyrics, debug=debug)
+            lyric_token_idx = self.tokenize_lyrics(
+                lyrics, debug=debug, vocal_language=vocal_language
+            )
             lyric_mask = [1] * len(lyric_token_idx)
             lyric_token_idx = (
                 torch.tensor(lyric_token_idx)
@@ -2007,7 +2098,7 @@ class ACEStepPipeline:
             )
             if len(edit_target_lyrics) > 0:
                 target_lyric_token_idx = self.tokenize_lyrics(
-                    edit_target_lyrics, debug=True
+                    edit_target_lyrics, debug=True, vocal_language=vocal_language
                 )
                 target_lyric_mask = [1] * len(target_lyric_token_idx)
                 target_lyric_token_idx = (

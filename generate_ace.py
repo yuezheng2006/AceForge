@@ -214,7 +214,10 @@ os.environ.setdefault(
 # -----------------------------------------------------------------------------
 
 ProgressCallback = Callable[[float, str], None]
+# Job progress: (fraction, stage, steps_current, steps_total, eta_seconds)
+JobProgressCallback = Callable[[float, str, Optional[int], Optional[int], Optional[float]], None]
 _PROGRESS_CALLBACK: Optional[ProgressCallback] = None
+_JOB_PROGRESS_CALLBACK: Optional[JobProgressCallback] = None
 
 
 def register_progress_callback(cb: Optional[ProgressCallback]) -> None:
@@ -228,21 +231,39 @@ def register_progress_callback(cb: Optional[ProgressCallback]) -> None:
     _PROGRESS_CALLBACK = cb
 
 
-def _report_progress(fraction: float, stage: str = "ace") -> None:
+def register_job_progress_callback(cb: Optional[JobProgressCallback]) -> None:
     """
-    Internal helper to report progress to the UI, if a callback is registered.
+    Register a callback for API job progress: (fraction, stage, steps_current,
+    steps_total, eta_seconds). Used to update per-job progress and ETA in the API.
     """
-    if _PROGRESS_CALLBACK is None:
-        return
+    global _JOB_PROGRESS_CALLBACK
+    _JOB_PROGRESS_CALLBACK = cb
+
+
+def _report_progress(
+    fraction: float,
+    stage: str = "ace",
+    steps_current: Optional[int] = None,
+    steps_total: Optional[int] = None,
+    eta_seconds: Optional[float] = None,
+) -> None:
+    """
+    Internal helper to report progress to the UI and optional job progress callback.
+    """
     try:
         frac = float(fraction)
     except Exception:
         frac = 0.0
-    try:
-        _PROGRESS_CALLBACK(frac, stage)
-    except Exception:
-        # Do not let UI progress errors kill generation
-        pass
+    if _PROGRESS_CALLBACK is not None:
+        try:
+            _PROGRESS_CALLBACK(frac, stage)
+        except Exception:
+            pass
+    if _JOB_PROGRESS_CALLBACK is not None:
+        try:
+            _JOB_PROGRESS_CALLBACK(frac, stage, steps_current, steps_total, eta_seconds)
+        except Exception:
+            pass
 
 
 # -----------------------------------------------------------------------------
@@ -335,10 +356,26 @@ def _monkeypatch_ace_tqdm() -> None:
                 if denom:
                     frac_local = idx / denom  # 0..1 within this stage
                     frac_global = start + span * frac_local
+                    steps_cur = getattr(inner, "n", idx)
+                    steps_tot = getattr(inner, "total", None)
+                    eta_sec = None
                     try:
-                        _report_progress(frac_global, stage=stage_name)
+                        fd = getattr(inner, "format_dict", None)
+                        if fd and isinstance(fd, dict):
+                            eta_sec = fd.get("remaining")
+                            if eta_sec is not None and not isinstance(eta_sec, (int, float)):
+                                eta_sec = None
                     except Exception:
-                        # Never let UI progress reporting kill generation
+                        pass
+                    try:
+                        _report_progress(
+                            frac_global,
+                            stage=stage_name,
+                            steps_current=steps_cur if steps_tot is not None else None,
+                            steps_total=int(steps_tot) if steps_tot is not None else None,
+                            eta_seconds=float(eta_sec) if eta_sec is not None else None,
+                        )
+                    except Exception:
                         pass
                 yield item
 
@@ -543,7 +580,7 @@ def _prepare_reference_audio(
         text2music instead of throwing.
     """
     task_norm = (task or "text2music").strip().lower()
-    if task_norm not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio"):
+    if task_norm not in ("text2music", "retake", "repaint", "extend", "cover", "audio2audio", "lego", "extract", "complete"):
         task_norm = "text2music"
     # Map UI task names to pipeline task: cover and audio2audio both run as retake
     # (pipeline will set task to "audio2audio" when ref_audio_input is passed).
@@ -735,6 +772,31 @@ def _apply_vocal_instrumental_mix_if_requested(
         pass
 
 
+# ACE-Step 1.5 LM planner dir names (same as api/ace_step_models.ACESTEP15_LM_IDS)
+_ACE_STEP_LM_DIRS = {"0.6B": "acestep-5Hz-lm-0.6B", "1.7B": "acestep-5Hz-lm-1.7B", "4B": "acestep-5Hz-lm-4B"}
+
+
+def _resolve_lm_checkpoint_path(ace_step_lm: str, checkpoints_root: Optional[Path] = None) -> Optional[Path]:
+    """
+    Resolve the LM planner checkpoint path from Settings (ace_step_lm).
+    Returns None if ace_step_lm is 'none' or not in map, or if the dir is not present.
+    Uses checkpoints_root if provided, else get_models_folder()/checkpoints.
+    No external LLM: this is the path to the downloaded ACE-Step 5Hz LM.
+    """
+    if not ace_step_lm or (ace_step_lm or "").strip().lower() == "none":
+        return None
+    lm_id = (ace_step_lm or "").strip()
+    dir_name = _ACE_STEP_LM_DIRS.get(lm_id)
+    if not dir_name:
+        return None
+    if checkpoints_root is None:
+        checkpoints_root = Path(cdmf_paths.get_models_folder()) / "checkpoints"
+    path = checkpoints_root / dir_name
+    if not path.is_dir():
+        return None
+    return path
+
+
 # -----------------------------------------------------------------------------
 #  ACE-Step bridge (to be wired to the real API)
 # -----------------------------------------------------------------------------
@@ -771,6 +833,18 @@ def _run_ace_text2music(
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
     cancel_check: Optional[Callable[[], bool]] = None,
+    vocal_language: str | None = None,
+    # Thinking / LM / CoT (passed to pipeline; used when LM path is integrated)
+    thinking: bool = False,
+    use_cot_metas: bool = True,
+    use_cot_caption: bool = True,
+    use_cot_language: bool = True,
+    lm_temperature: float = 0.85,
+    lm_cfg_scale: float = 2.0,
+    lm_top_k: int = 0,
+    lm_top_p: float = 0.9,
+    lm_negative_prompt: str = "NO USER INPUT",
+    lm_checkpoint_path: Optional[Path] = None,
 ) -> None:
     """
     Call ACE-Step Text2Music and render a single track into ``output_path``.
@@ -880,6 +954,19 @@ def _run_ace_text2music(
             "debug": False,
             "shift": 6.0,
         }
+        if vocal_language is not None and (vocal_language or "").strip():
+            call_kwargs["vocal_language"] = (vocal_language or "").strip()
+        call_kwargs["thinking"] = thinking
+        call_kwargs["use_cot_metas"] = use_cot_metas
+        call_kwargs["use_cot_caption"] = use_cot_caption
+        call_kwargs["use_cot_language"] = use_cot_language
+        call_kwargs["lm_temperature"] = lm_temperature
+        call_kwargs["lm_cfg_scale"] = lm_cfg_scale
+        call_kwargs["lm_top_k"] = lm_top_k
+        call_kwargs["lm_top_p"] = lm_top_p
+        call_kwargs["lm_negative_prompt"] = (lm_negative_prompt or "").strip() or "NO USER INPUT"
+        if lm_checkpoint_path is not None and lm_checkpoint_path:
+            call_kwargs["lm_checkpoint_path"] = str(lm_checkpoint_path)
         if cancel_check is not None:
             call_kwargs["cancel_check"] = cancel_check
 
@@ -1037,6 +1124,17 @@ def generate_track_ace(
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
     cancel_check: Optional[Callable[[], bool]] = None,
+    vocal_language: str = "",
+    # Thinking / LM / CoT (forwarded to pipeline for when LM path is integrated)
+    thinking: bool = False,
+    use_cot_metas: bool = True,
+    use_cot_caption: bool = True,
+    use_cot_language: bool = True,
+    lm_temperature: float = 0.85,
+    lm_cfg_scale: float = 2.0,
+    lm_top_k: int = 0,
+    lm_top_p: float = 0.9,
+    lm_negative_prompt: str = "NO USER INPUT",
 ) -> Dict[str, Any]:
     """
     High-level wrapper for the Flask UI.
@@ -1054,6 +1152,21 @@ def generate_track_ace(
 
     if not genre_prompt:
         raise ValueError("Genre / style prompt cannot be completely empty.")
+
+    # Preferences: DiT and LM (needed for base-only task check and logging)
+    config = cdmf_paths.load_config()
+    ace_step_dit_model = config.get("ace_step_dit_model") or "turbo"
+    ace_step_lm = config.get("ace_step_lm") or "1.7B"
+
+    # Base-only tasks (lego, extract, complete) require Base DiT model
+    task_for_check = (task or "text2music").strip().lower()
+    if task_for_check in ("lego", "extract", "complete"):
+        # Allow when user has selected Base in Settings → Models
+        if ace_step_dit_model != "base":
+            raise ValueError(
+                f"Task '{task_for_check}' requires the Base model. "
+                "Select Base in Settings → Models (DiT) and ensure the base model is downloaded, then try again."
+            )
 
     requested_total = float(target_seconds)
     if requested_total <= 0:
@@ -1122,7 +1235,8 @@ def generate_track_ace(
 
     print(
         f"[ACE] Generating track → {out_path} "
-        f"(target ≈ {requested_total:.1f}s, seed={eff_seed}, "
+        f"(dit={ace_step_dit_model}, lm={ace_step_lm}, "
+        f"target ≈ {requested_total:.1f}s, seed={eff_seed}, "
         f"bpm={bpm_val}, instrumental={instrumental}, "
         f"steps={steps}, guidance={guidance_scale}, "
         f"scheduler={scheduler_type}, cfg={cfg_type}, "
@@ -1132,6 +1246,19 @@ def generate_track_ace(
 
     _report_progress(0.05, "start")
     _report_progress(0.15, "ace_infer")
+
+    # Resolve LM planner path from Settings (bundled 5Hz LM, no external LLM)
+    lm_checkpoint_path = None
+    if thinking and ace_step_lm and (ace_step_lm.strip().lower() != "none"):
+        try:
+            checkpoints_root = Path(cdmf_paths.get_models_folder()) / "checkpoints"
+            lm_checkpoint_path = _resolve_lm_checkpoint_path(ace_step_lm, checkpoints_root)
+        except Exception:
+            lm_checkpoint_path = None
+        if lm_checkpoint_path:
+            print(f"[ACE] LM planner: {ace_step_lm} at {lm_checkpoint_path}", flush=True)
+        else:
+            print(f"[ACE] LM planner '{ace_step_lm}' selected but checkpoint not found; DiT-only.", flush=True)
 
     if instrumental:
         effective_lyrics = "[inst]"
@@ -1166,6 +1293,17 @@ def generate_track_ace(
         lora_name_or_path=lora_name_or_path,
         lora_weight=float(lora_weight),
         cancel_check=cancel_check,
+        vocal_language=(vocal_language or "").strip() or None,
+        thinking=thinking,
+        use_cot_metas=use_cot_metas,
+        use_cot_caption=use_cot_caption,
+        use_cot_language=use_cot_language,
+        lm_temperature=lm_temperature,
+        lm_cfg_scale=lm_cfg_scale,
+        lm_top_k=lm_top_k,
+        lm_top_p=lm_top_p,
+        lm_negative_prompt=(lm_negative_prompt or "").strip() or "NO USER INPUT",
+        lm_checkpoint_path=lm_checkpoint_path,
     )
 
     _report_progress(0.90, "fades")

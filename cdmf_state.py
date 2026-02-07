@@ -10,6 +10,23 @@ from ace_model_setup import ace_models_present
 
 
 # ---------------------------------------------------------------------------
+# Current generation job id (thread-local) for log tagging and API progress
+# ---------------------------------------------------------------------------
+
+_current_job_id_holder: threading.local = threading.local()
+
+
+def set_current_generation_job_id(job_id: Optional[str]) -> None:
+    """Set the current thread's generation job id (used by API worker and logs)."""
+    _current_job_id_holder.job_id = job_id
+
+
+def get_current_generation_job_id() -> Optional[str]:
+    """Return the current thread's generation job id, or None."""
+    return getattr(_current_job_id_holder, "job_id", None)
+
+
+# ---------------------------------------------------------------------------
 # Generation progress (shared with /progress endpoint and model downloads)
 # ---------------------------------------------------------------------------
 
