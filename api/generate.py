@@ -405,7 +405,18 @@ def create_job():
         data = raw if isinstance(raw, dict) else {}
         logging.info("[API generate] Request body keys: %s", list(data.keys()) if data else [])
 
-        if not data.get("customMode") and not data.get("songDescription"):
+        task_for_validation = (data.get("taskType") or "text2music").strip().lower()
+        base_only_tasks = ("lego", "extract", "complete")
+        if task_for_validation in base_only_tasks:
+            # Lego/extract/complete: require source audio and caption/instruction (no songDescription)
+            src_audio = (data.get("sourceAudioUrl") or data.get("source_audio_path") or "").strip()
+            instruction = (data.get("instruction") or "").strip()
+            style = (data.get("style") or "").strip()
+            if not src_audio:
+                return jsonify({"error": "Backing/source audio required for Lego (and extract/complete)"}), 400
+            if not instruction and not style:
+                return jsonify({"error": "Describe the track (caption) or instruction required for Lego"}), 400
+        elif not data.get("customMode") and not data.get("songDescription"):
             return jsonify({"error": "Song description required for simple mode"}), 400
         # Custom mode: require at least one of style, lyrics, reference audio, or source audio
         if data.get("customMode"):
