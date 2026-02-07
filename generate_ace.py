@@ -977,22 +977,19 @@ def _run_ace_text2music(
 
         # Wire up reference vs source audio per ACE-Step pipeline:
         #
-        # - retake / cover / audio2audio: use ref_audio_input (pipeline sets task to
-        #   "audio2audio" and uses ref_latents). Do NOT pass src_audio_path.
-        # - repaint / extend: use src_audio_path (pipeline uses src_latents for the
-        #   segment to repaint or extend). Do NOT pass ref_audio_input for this path.
-        # - lego / extract / complete: use src_audio_path only (for duration); pipeline
-        #   sets src_latents=None and generates from prompt. Do NOT pass ref_audio_input
-        #   or the pipeline would treat it as audio2audio and output would equal input.
+        # - retake / cover / audio2audio / lego / extract / complete: use ref_audio_input so the pipeline
+        #   gets backing latents. For lego we use LOW ref_audio_strength (API default 0.3) so diffusion
+        #   starts from noisy backing and denoises toward the prompt (new instrument), matching timing.
+        # - repaint / extend: use src_audio_path (pipeline uses src_latents for repaint/extend segment).
         # - text2music: leave both unset (None).
         if not src_audio_path:
             call_kwargs["ref_audio_input"] = None
             call_kwargs["src_audio_path"] = None
-        elif task in ("repaint", "extend", "lego", "extract", "complete"):
+        elif task in ("repaint", "extend"):
             call_kwargs["src_audio_path"] = src_audio_path
             call_kwargs["ref_audio_input"] = None
         else:
-            # retake (including cover/audio2audio from UI)
+            # retake, cover, audio2audio, lego, extract, complete: backing as ref (lego uses low ref_audio_strength)
             call_kwargs["ref_audio_input"] = src_audio_path
             call_kwargs["src_audio_path"] = None
 

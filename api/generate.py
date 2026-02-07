@@ -5,11 +5,21 @@ job queue stored under get_user_data_dir(). No auth. Real implementation (no moc
 
 import json
 import logging
+import re
 import threading
 import time
 import uuid
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
+
+def _uppercase_track_in_instruction(instruction):
+    """Uppercase TRACK_NAME in 'Generate the X track ...' to match ACE-Step (cli.py _default_instruction_for_task)."""
+    if not instruction or " track " not in instruction:
+        return instruction
+    m = re.search(r"(\bthe\s+)(\w+)(\s+track\b)", instruction, re.IGNORECASE)
+    if m:
+        return instruction[: m.start(2)] + m.group(2).upper() + instruction[m.end(2) :]
+    return instruction
 
 from cdmf_paths import get_output_dir, get_user_data_dir, load_config
 from cdmf_tracks import list_lora_adapters, load_track_meta, save_track_meta
@@ -122,12 +132,16 @@ def _run_generation(job_id: str) -> None:
         if task not in allowed_tasks:
             task = "text2music"
         # Single style/caption field drives all text conditioning (ACE-Step caption).
-        # Simple mode: songDescription. Advanced mode: style. Lego: instruction + caption.
-        if task == "lego":
+        # Simple mode: songDescription. Advanced mode: style. Lego/extract/complete: instruction + caption only (no metas; source sets context).
+        if task in ("lego", "extract", "complete"):
             instruction = (params.get("instruction") or "").strip()
             caption = (params.get("style") or "").strip()
-            prompt = (instruction + " " + caption).strip() if (instruction or caption) else "Generate an instrument track based on the audio context"
+            if not instruction and not caption:
+                instruction = "Generate an instrument track based on the audio context:"
+            prompt = None  # built below after we have duration/bpm/metas
         else:
+            instruction = None
+            caption = None
             prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
         key_scale = (params.get("keyScale") or "").strip()
         time_sig = (params.get("timeSignature") or "").strip()
@@ -192,6 +206,13 @@ def _run_generation(job_id: str) -> None:
                     bpm = None
             except (TypeError, ValueError):
                 bpm = None
+        # Lego/extract/complete: instruction (uppercase track) + caption only. No metas — BPM/key/timesignature
+        # should match the input backing; passing them would be for cover/target-style mode.
+        if task in ("lego", "extract", "complete"):
+            instruction = _uppercase_track_in_instruction(
+                instruction or "Generate an instrument track based on the audio context:"
+            )
+            prompt = (instruction + "\n\n" + (caption or "")).strip() or instruction
         title = (params.get("title") or "Untitled").strip() or "Track"
         reference_audio_url = (params.get("referenceAudioUrl") or params.get("reference_audio_path") or "").strip()
         source_audio_url = (params.get("sourceAudioUrl") or params.get("src_audio_path") or "").strip()
@@ -203,11 +224,14 @@ def _run_generation(job_id: str) -> None:
             resolved = _resolve_audio_url_to_path(reference_audio_url) if reference_audio_url else None
             src_audio_path = resolved or (_resolve_audio_url_to_path(source_audio_url) if source_audio_url else None)
 
-        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint).
-        # Lego/extract/complete use src_audio only for duration and context; they must NOT use ref_latents (output would = input).
-        # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; 0.5–0.8 = more caption influence.
-        audio2audio_enable = bool(src_audio_path) and task not in ("lego", "extract", "complete")
+        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint/lego).
+        # Lego/extract/complete: use ref_audio so the model gets backing as context; use LOW ref_audio_strength
+        # (e.g. 0.3) so diffusion starts from noisy backing and denoises toward the prompt (new instrument), not a copy.
+        # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; lower = more prompt influence.
+        audio2audio_enable = bool(src_audio_path)
         ref_default = 0.8 if task in ("cover", "retake", "audio2audio") else 0.7
+        if task in ("lego", "extract", "complete"):
+            ref_default = 0.3  # low strength so output follows prompt (instrument) while matching backing timing
         ref_audio_strength = float(params.get("audioCoverStrength") or params.get("ref_audio_strength") or ref_default)
         ref_audio_strength = max(0.0, min(1.0, ref_audio_strength))
 
