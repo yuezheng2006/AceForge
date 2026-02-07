@@ -60,6 +60,12 @@ const KEY_SIGNATURES = [
 
 const TIME_SIGNATURES = ['', '2/4', '3/4', '4/4', '6/8'];
 
+// Lego / Extract / Complete: available track names (ACE-Step 1.5 Base model)
+const LEGO_TRACKS = [
+  'vocals', 'backing_vocals', 'drums', 'bass', 'guitar', 'keyboard',
+  'percussion', 'strings', 'synth', 'fx', 'brass', 'woodwinds',
+];
+
 const VOCAL_LANGUAGES = [
   { value: 'unknown', label: 'Auto / Instrumental' },
   { value: 'ar', label: 'Arabic' },
@@ -114,11 +120,36 @@ const VOCAL_LANGUAGES = [
   { value: 'zh', label: 'Chinese (Mandarin)' },
 ];
 
+// Create panel mode: Simple (description), Custom (full controls), Lego (add-instrument tracks)
+type CreateMode = 'simple' | 'custom' | 'lego';
+
+// Lego track names (ACE-Step 1.5 Base model only) — https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/GRADIO_GUIDE.md#lego-base-model-only
+const LEGO_TRACKS = [
+  { value: 'vocals', label: 'Vocals' },
+  { value: 'backing_vocals', label: 'Backing vocals' },
+  { value: 'drums', label: 'Drums' },
+  { value: 'bass', label: 'Bass' },
+  { value: 'guitar', label: 'Guitar' },
+  { value: 'keyboard', label: 'Keyboard' },
+  { value: 'percussion', label: 'Percussion' },
+  { value: 'strings', label: 'Strings' },
+  { value: 'synth', label: 'Synth' },
+  { value: 'fx', label: 'FX' },
+  { value: 'brass', label: 'Brass' },
+  { value: 'woodwinds', label: 'Woodwinds' },
+];
+
 export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData }) => {
   const { isAuthenticated, token } = useAuth();
 
-  // Mode
-  const [customMode, setCustomMode] = useState(true);
+  // Mode: simple | custom | lego (Lego = dedicated tab for add-instrument)
+  const [createMode, setCreateMode] = useState<CreateMode>('custom');
+  const customMode = createMode === 'custom';
+
+  // Lego tab only
+  const [legoTrackName, setLegoTrackName] = useState('guitar');
+  const [legoCaption, setLegoCaption] = useState('');
+  const [legoValidationError, setLegoValidationError] = useState('');
 
   // Simple Mode
   const [songDescription, setSongDescription] = useState('');
@@ -225,6 +256,8 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   const [getLrc, setGetLrc] = useState(false);
   const [scoreScale, setScoreScale] = useState(0.5);
   const [lmBatchChunkSize, setLmBatchChunkSize] = useState(8);
+  const [trackName, setTrackName] = useState('');           // Lego/Extract: single track (e.g. guitar)
+  const [completeTrackClasses, setCompleteTrackClasses] = useState(''); // Complete: comma-separated (e.g. drums, bass, guitar)
   const [isFormatCaption, setIsFormatCaption] = useState(false);
 
   const [isUploadingReference, setIsUploadingReference] = useState(false);
@@ -640,7 +673,76 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
   };
 
   const handleGenerate = () => {
-    console.log('[CreatePanel] Create button clicked', { bulkCount, customMode, isAuthenticated });
+    console.log('[CreatePanel] Create button clicked', { bulkCount, customMode, createMode, isAuthenticated });
+
+    // Lego mode: require backing audio and send a single lego job
+    if (createMode === 'lego') {
+      setLegoValidationError('');
+      if (!sourceAudioUrl?.trim()) {
+        setLegoValidationError('Please select backing audio (required for Lego).');
+        return;
+      }
+      const instruction = `Generate the ${legoTrackName} track based on the audio context:`;
+      const effGuidance = guidanceScale;
+      const effAudioCover = audioCoverStrength;
+      const effLmTemp = lmTemperature;
+      onGenerate({
+        customMode: false,
+        songDescription: undefined,
+        prompt: instruction + (legoCaption.trim() ? ' ' + legoCaption.trim() : ''),
+        lyrics: '',
+        style: legoCaption.trim() || instruction,
+        title: title.trim() || `Lego ${legoTrackName}`,
+        instrumental: true,
+        vocalLanguage: 'en',
+        bpm: 0,
+        keyScale: '',
+        timeSignature: '',
+        duration: -1,
+        inferenceSteps,
+        guidanceScale: effGuidance,
+        batchSize: 1,
+        randomSeed: randomSeed,
+        seed: randomSeed ? -1 : seed,
+        thinking,
+        audioFormat,
+        inferMethod,
+        shift,
+        lmTemperature: effLmTemp,
+        lmCfgScale,
+        lmTopK,
+        lmTopP,
+        lmNegativePrompt,
+        referenceAudioUrl: undefined,
+        sourceAudioUrl: sourceAudioUrl.trim(),
+        audioCodes: undefined,
+        repaintingStart: 0,
+        repaintingEnd: -1,
+        audioCoverStrength: effAudioCover,
+        taskType: 'lego',
+        instruction,
+        useAdg,
+        cfgIntervalStart,
+        cfgIntervalEnd,
+        customTimesteps: customTimesteps.trim() || undefined,
+        loraNameOrPath: loraNameOrPath.trim() || undefined,
+        loraWeight,
+        useCotMetas,
+        useCotCaption,
+        useCotLanguage,
+        autogen,
+        constrainedDecodingDebug,
+        allowLmBatch,
+        getScores,
+        getLrc,
+        scoreScale,
+        lmBatchChunkSize,
+        negativePrompt: negativePrompt.trim() || undefined,
+        isFormatCaption,
+      });
+      return;
+    }
+
     // Bulk generation: loop bulkCount times
     for (let i = 0; i < bulkCount; i++) {
       // Seed handling: first job uses user's seed, rest get random seeds
@@ -766,22 +868,28 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
           <div className="flex items-center bg-zinc-200 dark:bg-black/40 rounded-lg p-1 border border-zinc-300 dark:border-white/5">
             <button
-              onClick={() => setCustomMode(false)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${!customMode ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
+              onClick={() => setCreateMode('simple')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'simple' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Simple
             </button>
             <button
-              onClick={() => setCustomMode(true)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${customMode ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
+              onClick={() => setCreateMode('custom')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'custom' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Custom
+            </button>
+            <button
+              onClick={() => { setCreateMode('lego'); setLegoValidationError(''); }}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'lego' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
+            >
+              Lego
             </button>
           </div>
         </div>
 
         {/* SIMPLE MODE */}
-        {!customMode && (
+        {createMode === 'simple' && (
           <div className="space-y-5">
             {/* Title (same as Custom mode) */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
@@ -1066,8 +1174,113 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
           </div>
         )}
 
+        {/* LEGO MODE — generate a single instrument track over existing audio */}
+        {createMode === 'lego' && (
+          <div className="space-y-5">
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 p-4">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Generate one instrument track to layer over your backing audio. Pick the track type and describe how it should sound.
+              </p>
+            </div>
+
+            {/* Title (optional) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                Title (optional)
+              </div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Name the output"
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none"
+              />
+            </div>
+
+            {/* Source audio (required for Lego) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Backing audio
+                <span className="text-red-500">*</span>
+                <InfoTooltip text="The existing audio to add an instrument track to. Required for Lego." />
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => openAudioModal('source')} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                    Library
+                  </button>
+                  <button type="button" onClick={() => sourceInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors">
+                    Upload
+                  </button>
+                </div>
+                <input ref={sourceInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadAudio(f, 'source'); e.target.value = ''; }} />
+                {sourceAudioUrl ? (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate" title={sourceAudioUrl}>{getAudioLabel(sourceAudioUrl)}</p>
+                ) : (
+                  <p className="text-xs text-zinc-400 italic">No backing audio selected</p>
+                )}
+              </div>
+            </div>
+
+            {/* Track to generate */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                Track to generate
+              </div>
+              <select
+                value={legoTrackName}
+                onChange={(e) => setLegoTrackName(e.target.value)}
+                className="w-full bg-transparent p-3 text-sm text-zinc-900 dark:text-white focus:outline-none"
+              >
+                {LEGO_TRACKS.map(t => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Describe the track (caption) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5">
+                Describe the track
+              </div>
+              <textarea
+                value={legoCaption}
+                onChange={(e) => setLegoCaption(e.target.value)}
+                placeholder="e.g. lead guitar melody with bluesy feel, punchy drums, warm bass line..."
+                className="w-full h-24 bg-transparent p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none resize-none"
+              />
+            </div>
+
+            {/* Quality preset (Lego) */}
+            <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
+              <div className="px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/5 flex items-center gap-1.5">
+                Quality
+                <InfoTooltip text="Basic: fast. Great: balanced. Best: maximum quality (more steps, LM thinking)." />
+              </div>
+              <div className="p-3 flex gap-2">
+                {(['basic', 'great', 'best'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => applyPreset(p)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      qualityPreset === p ? 'bg-pink-500 text-white' : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {p === 'basic' ? 'Basic' : p === 'great' ? 'Great' : 'Best'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {legoValidationError && (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">{legoValidationError}</p>
+            )}
+          </div>
+        )}
+
         {/* CUSTOM MODE */}
-        {customMode && (
+        {createMode === 'custom' && (
           <div className="space-y-5">
             {/* Title */}
             <div className="bg-white dark:bg-suno-card rounded-xl border border-zinc-200 dark:border-white/5 overflow-hidden">
@@ -2433,9 +2646,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
         >
           <Sparkles size={18} />
           <span>
-            {bulkCount > 1
-              ? `Create ${bulkCount} Jobs (${bulkCount * batchSize} tracks)`
-              : `Create${batchSize > 1 ? ` (${batchSize} variations)` : ''}`}
+            {createMode === 'lego'
+              ? 'Generate Lego track'
+              : bulkCount > 1
+                ? `Create ${bulkCount} Jobs (${bulkCount * batchSize} tracks)`
+                : `Create${batchSize > 1 ? ` (${batchSize} variations)` : ''}`}
           </span>
         </button>
       </div>

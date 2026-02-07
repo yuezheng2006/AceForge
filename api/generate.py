@@ -122,22 +122,28 @@ def _run_generation(job_id: str) -> None:
         if task not in allowed_tasks:
             task = "text2music"
         # Single style/caption field drives all text conditioning (ACE-Step caption).
-        # Simple mode: songDescription. Advanced mode: style. Both can have key, time sig, vocal language.
-        prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
+        # Simple mode: songDescription. Advanced mode: style. Lego: instruction + caption.
+        if task == "lego":
+            instruction = (params.get("instruction") or "").strip()
+            caption = (params.get("style") or "").strip()
+            prompt = (instruction + " " + caption).strip() if (instruction or caption) else "Generate an instrument track based on the audio context"
+        else:
+            prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
         key_scale = (params.get("keyScale") or "").strip()
         time_sig = (params.get("timeSignature") or "").strip()
         vocal_lang = (params.get("vocalLanguage") or "").strip().lower()
         extra_bits = []
-        if key_scale:
-            extra_bits.append(f"key {key_scale}")
-        if time_sig:
-            extra_bits.append(f"time signature {time_sig}")
-        if vocal_lang and vocal_lang not in ("unknown", ""):
-            extra_bits.append(f"vocal language {vocal_lang}")
-        if extra_bits:
-            prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
-        # When user explicitly chose English, reinforce in caption so model conditions on it
-        if vocal_lang == "en" and prompt:
+        if task != "lego":
+            if key_scale:
+                extra_bits.append(f"key {key_scale}")
+            if time_sig:
+                extra_bits.append(f"time signature {time_sig}")
+            if vocal_lang and vocal_lang not in ("unknown", ""):
+                extra_bits.append(f"vocal language {vocal_lang}")
+            if extra_bits:
+                prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
+        # When user explicitly chose English, reinforce in caption so model conditions on it (skip for lego)
+        if task != "lego" and vocal_lang == "en" and prompt:
             if not prompt.lower().startswith("english"):
                 prompt = f"English vocals, {prompt}"
         if not prompt:
@@ -189,8 +195,8 @@ def _run_generation(job_id: str) -> None:
         title = (params.get("title") or "Untitled").strip() or "Track"
         reference_audio_url = (params.get("referenceAudioUrl") or params.get("reference_audio_path") or "").strip()
         source_audio_url = (params.get("sourceAudioUrl") or params.get("src_audio_path") or "").strip()
-        # For cover/retake use source-first (song to cover); for style/reference use reference-first
-        if task in ("cover", "retake"):
+        # For cover/retake/lego use source-first (backing/song to cover); for style/reference use reference-first
+        if task in ("cover", "retake", "lego"):
             resolved = _resolve_audio_url_to_path(source_audio_url) if source_audio_url else None
             src_audio_path = resolved or (_resolve_audio_url_to_path(reference_audio_url) if reference_audio_url else None)
         else:

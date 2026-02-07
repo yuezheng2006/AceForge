@@ -592,15 +592,18 @@ def _prepare_reference_audio(
     if audio2audio_enable and task_norm == "text2music":
         task_norm = "retake"
 
-    # Any of the edit-style tasks imply some form of Audio2Audio.
+    # Any of the edit-style tasks imply some form of Audio2Audio or source-backed (lego/extract/complete).
     audio2audio_flag = bool(
         audio2audio_enable or task_norm in ("retake", "repaint", "extend")
     )
+    needs_src_path = audio2audio_flag or task_norm in ("lego", "extract", "complete")
 
-    # If we *think* we're in an edit / audio2audio mode but there's no
-    # reference audio path at all, don't crash — just fall back to
-    # plain text2music.
-    if audio2audio_flag and not src_audio_path:
+    # If we need source/reference audio but none was provided, fall back to text2music (or fail for lego/extract/complete).
+    if needs_src_path and not src_audio_path:
+        if task_norm in ("lego", "extract", "complete"):
+            raise ValueError(
+                f"Task '{task_norm}' requires backing/source audio. Please provide it in the Lego tab or Custom audio card."
+            )
         print(
             "[ACE] Audio2Audio / edit task requested but no reference audio "
             "was provided — falling back to plain text2music.",
@@ -612,6 +615,8 @@ def _prepare_reference_audio(
 
     if audio2audio_flag:
         ref_path = _ensure_reference_wav(src_audio_path)
+    elif task_norm in ("lego", "extract", "complete"):
+        ref_path = _ensure_reference_wav(src_audio_path)  # pipeline uses this as src_audio_path
     else:
         ref_path = None
 

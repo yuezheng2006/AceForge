@@ -2052,9 +2052,12 @@ class ACEStepPipeline:
         preprocess_time_cost = end_time - start_time
         start_time = end_time
 
-        add_retake_noise = task in ("retake", "repaint", "extend")
-        # retake equal to repaint
+        add_retake_noise = task in ("retake", "repaint", "extend", "lego", "extract", "complete")
+        # retake equal to repaint; lego/extract/complete use full backing duration
         if task == "retake":
+            repaint_start = 0
+            repaint_end = audio_duration
+        if task in ("lego", "extract", "complete"):
             repaint_start = 0
             repaint_end = audio_duration
 
@@ -2064,7 +2067,10 @@ class ACEStepPipeline:
                 "repaint",
                 "edit",
                 "extend",
-            ), "src_audio_path is required for retake/repaint/extend task"
+                "lego",
+                "extract",
+                "complete",
+            ), "src_audio_path is required for repaint/extend/lego/extract/complete task"
             assert os.path.exists(
                 src_audio_path
             ), f"src_audio_path {src_audio_path} does not exist"
