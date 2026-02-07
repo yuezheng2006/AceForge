@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, ChevronDown, Settings2, Trash2, Music2, Sliders, Dices, Hash, RefreshCw, Plus, Upload, Play, Pause, Info, Loader2, Wrench } from 'lucide-react';
 import { GenerationParams, Song } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { generateApi, type LoraAdapter } from '../services/api';
+import { generateApi, preferencesApi, aceStepModelsApi, type LoraAdapter } from '../services/api';
+
+/** Tasks that require ACE-Step Base model only (see docs/ACE-Step-Tutorial.md). */
+const TASKS_REQUIRING_BASE = ['lego', 'extract', 'complete'] as const;
+function taskRequiresBase(taskType: string): boolean {
+  return TASKS_REQUIRING_BASE.includes(taskType as typeof TASKS_REQUIRING_BASE[number]);
+}
 
 interface ReferenceTrack {
   id: string;
@@ -23,6 +29,8 @@ interface CreatePanelProps {
   onGenerate: (params: GenerationParams) => void;
   isGenerating: boolean;
   initialData?: { song: Song, timestamp: number } | null;
+  /** Open Settings modal (e.g. to download required model). */
+  onOpenSettings?: () => void;
 }
 
 /** Visible tooltip on hover (native title has delay and is unreliable). */
@@ -62,8 +70,18 @@ const TIME_SIGNATURES = ['', '2/4', '3/4', '4/4', '6/8'];
 
 // Lego / Extract / Complete: available track names (ACE-Step 1.5 Base model)
 const LEGO_TRACKS = [
-  'vocals', 'backing_vocals', 'drums', 'bass', 'guitar', 'keyboard',
-  'percussion', 'strings', 'synth', 'fx', 'brass', 'woodwinds',
+  { value: 'vocals', label: 'Vocals' },
+  { value: 'backing_vocals', label: 'Backing vocals' },
+  { value: 'drums', label: 'Drums' },
+  { value: 'bass', label: 'Bass' },
+  { value: 'guitar', label: 'Guitar' },
+  { value: 'keyboard', label: 'Keyboard' },
+  { value: 'percussion', label: 'Percussion' },
+  { value: 'strings', label: 'Strings' },
+  { value: 'synth', label: 'Synth' },
+  { value: 'fx', label: 'FX' },
+  { value: 'brass', label: 'Brass' },
+  { value: 'woodwinds', label: 'Woodwinds' },
 ];
 
 const VOCAL_LANGUAGES = [
@@ -123,23 +141,7 @@ const VOCAL_LANGUAGES = [
 // Create panel mode: Simple (description), Custom (full controls), Lego (add-instrument tracks)
 type CreateMode = 'simple' | 'custom' | 'lego';
 
-// Lego track names (ACE-Step 1.5 Base model only) — https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/GRADIO_GUIDE.md#lego-base-model-only
-const LEGO_TRACKS = [
-  { value: 'vocals', label: 'Vocals' },
-  { value: 'backing_vocals', label: 'Backing vocals' },
-  { value: 'drums', label: 'Drums' },
-  { value: 'bass', label: 'Bass' },
-  { value: 'guitar', label: 'Guitar' },
-  { value: 'keyboard', label: 'Keyboard' },
-  { value: 'percussion', label: 'Percussion' },
-  { value: 'strings', label: 'Strings' },
-  { value: 'synth', label: 'Synth' },
-  { value: 'fx', label: 'FX' },
-  { value: 'brass', label: 'Brass' },
-  { value: 'woodwinds', label: 'Woodwinds' },
-];
-
-export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData }) => {
+export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerating, initialData, onOpenSettings }) => {
   const { isAuthenticated, token } = useAuth();
 
   // Mode: simple | custom | lego (Lego = dedicated tab for add-instrument)
@@ -672,8 +674,26 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
     e.preventDefault();
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     console.log('[CreatePanel] Create button clicked', { bulkCount, customMode, createMode, isAuthenticated });
+
+    const effectiveTaskType = createMode === 'lego' ? 'lego' : (customMode ? taskType : (sourceAudioUrl?.trim() ? 'cover' : 'text2music'));
+    if (taskRequiresBase(effectiveTaskType)) {
+      setLegoValidationError('');
+      try {
+        const list = await aceStepModelsApi.list();
+        const baseInstalled = list.dit_models.some((m) => m.id === 'base' && m.installed);
+        if (!baseInstalled) {
+          setLegoValidationError('Lego (and Extract/Complete) require the Base model. Open Settings to download it, then try again.');
+          onOpenSettings?.();
+          return;
+        }
+      } catch (e) {
+        setLegoValidationError('Could not check models. Open Settings to ensure the Base model is installed.');
+        onOpenSettings?.();
+        return;
+      }
+    }
 
     // Lego mode: require backing audio and send a single lego job
     if (createMode === 'lego') {
@@ -868,19 +888,23 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
           <div className="flex items-center bg-zinc-200 dark:bg-black/40 rounded-lg p-1 border border-zinc-300 dark:border-white/5">
             <button
-              onClick={() => setCreateMode('simple')}
+              onClick={() => { setCreateMode('simple'); setLegoValidationError(''); }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'simple' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Simple
             </button>
             <button
-              onClick={() => setCreateMode('custom')}
+              onClick={() => { setCreateMode('custom'); setLegoValidationError(''); }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'custom' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Custom
             </button>
             <button
-              onClick={() => { setCreateMode('lego'); setLegoValidationError(''); }}
+              onClick={() => {
+                setCreateMode('lego');
+                setLegoValidationError('');
+                preferencesApi.update({ ace_step_dit_model: 'base' }).catch(() => {});
+              }}
               className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${createMode === 'lego' ? 'bg-white dark:bg-zinc-800 text-black dark:text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}
             >
               Lego
@@ -1273,9 +1297,6 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
               </div>
             </div>
 
-            {legoValidationError && (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">{legoValidationError}</p>
-            )}
           </div>
         )}
 
@@ -2184,7 +2205,14 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
                 </span>
                 <select
                   value={taskType}
-                  onChange={(e) => setTaskType(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTaskType(v);
+                    setLegoValidationError('');
+                    if (taskRequiresBase(v)) {
+                      preferencesApi.update({ ace_step_dit_model: 'base' }).catch(() => {});
+                    }
+                  }}
                   className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-2 py-1.5 text-xs text-zinc-900 dark:text-white focus:outline-none"
                 >
                   <option value="text2music">Text → Music</option>
@@ -2640,8 +2668,11 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({ onGenerate, isGenerati
 
       {/* Footer Create Button */}
       <div className="p-4 mt-auto sticky bottom-0 bg-zinc-50/95 dark:bg-suno-panel/95 backdrop-blur-sm z-10 border-t border-zinc-200 dark:border-white/5 space-y-3">
+        {legoValidationError && (
+          <p className="text-sm text-red-600 dark:text-red-400" role="alert">{legoValidationError}</p>
+        )}
         <button
-          onClick={handleGenerate}
+          onClick={() => void handleGenerate()}
           className="w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] bg-gradient-to-r from-orange-500 to-pink-600 text-white shadow-lg hover:brightness-110"
         >
           <Sparkles size={18} />

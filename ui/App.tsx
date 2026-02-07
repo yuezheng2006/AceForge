@@ -1101,6 +1101,7 @@ export default function App() {
                 onGenerate={handleGenerate}
                 isGenerating={isGenerating}
                 initialData={reuseData}
+                onOpenSettings={() => setShowSettingsModal(true)}
               />
             </div>
 
