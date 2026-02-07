@@ -204,8 +204,9 @@ def _run_generation(job_id: str) -> None:
             src_audio_path = resolved or (_resolve_audio_url_to_path(source_audio_url) if source_audio_url else None)
 
         # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint).
+        # Lego/extract/complete use src_audio only for duration and context; they must NOT use ref_latents (output would = input).
         # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; 0.5–0.8 = more caption influence.
-        audio2audio_enable = bool(src_audio_path)
+        audio2audio_enable = bool(src_audio_path) and task not in ("lego", "extract", "complete")
         ref_default = 0.8 if task in ("cover", "retake", "audio2audio") else 0.7
         ref_audio_strength = float(params.get("audioCoverStrength") or params.get("ref_audio_strength") or ref_default)
         ref_audio_strength = max(0.0, min(1.0, ref_audio_strength))
@@ -233,6 +234,10 @@ def _run_generation(job_id: str) -> None:
         thinking = bool(params.get("thinking", False))
         use_cot_metas = bool(params.get("useCotMetas", True))
         use_cot_caption = bool(params.get("useCotCaption", True))
+        # Lego/extract/complete: instruction must stay verbatim ("Generate the X track based on the audio context:").
+        # LM refinement would rephrase and can drop the track-type instruction, so disable CoT caption for these tasks.
+        if task in ("lego", "extract", "complete"):
+            use_cot_caption = False
         use_cot_language = bool(params.get("useCotLanguage", True))
         try:
             lm_temperature = float(params.get("lmTemperature") or params.get("lm_temperature") or 0.85)

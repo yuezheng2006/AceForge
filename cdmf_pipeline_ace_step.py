@@ -2052,8 +2052,10 @@ class ACEStepPipeline:
         preprocess_time_cost = end_time - start_time
         start_time = end_time
 
-        add_retake_noise = task in ("retake", "repaint", "extend", "lego", "extract", "complete")
-        # retake equal to repaint; lego/extract/complete use full backing duration
+        # Lego/extract/complete: generate NEW track from prompt only; use source only for duration (no repaint/retake).
+        # Repaint/retake/extend: use src_latents in diffusion.
+        add_retake_noise = task in ("retake", "repaint", "extend")
+        # retake equal to repaint
         if task == "retake":
             repaint_start = 0
             repaint_end = audio_duration
@@ -2074,7 +2076,14 @@ class ACEStepPipeline:
             assert os.path.exists(
                 src_audio_path
             ), f"src_audio_path {src_audio_path} does not exist"
-            src_latents = self.infer_latents(src_audio_path)
+            src_latents_inferred = self.infer_latents(src_audio_path)
+            if task in ("lego", "extract", "complete"):
+                # Use source only to set output duration; do not pass latents into diffusion (generate from scratch with prompt).
+                num_frames = src_latents_inferred.shape[-1]
+                audio_duration = num_frames * 512 * 8 / 44100.0
+                src_latents = None  # no repaint for lego
+            else:
+                src_latents = src_latents_inferred
         
         ref_latents = None
         if ref_audio_input is not None and audio2audio_enable:
