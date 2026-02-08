@@ -154,8 +154,12 @@ def _run_generation(job_id: str) -> None:
             duration = float(d if d is not None else 60)
         except (TypeError, ValueError):
             duration = 60
-        # UI may send duration=-1 or 0; clamp to valid range (15–240s)
-        duration = max(15, min(240, duration))
+        # UI may send duration=-1 or 0 for auto-detection; only clamp positive values to valid range (15–240s)
+        if duration > 0:
+            duration = max(15, min(240, duration))
+        elif duration < 0 and duration != -1:
+            # Normalize invalid negative values to -1 (auto mode) for defensive programming
+            duration = -1
         # Guide: 65 steps + CFG 4.0 for best quality; low CFG reduces artifacts (see community guide).
         try:
             steps = int(params.get("inferenceSteps") or 65)

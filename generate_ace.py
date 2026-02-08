@@ -879,7 +879,13 @@ def _run_ace_text2music(
     if not tags:
         raise ValueError("ACE-Step: tags/prompt cannot be empty.")
 
-    seconds = max(1.0, float(seconds))
+    # Allow -1 or 0 for auto-detection (pipeline randomly selects 30-240s); otherwise clamp to minimum 1.0s
+    seconds = float(seconds)
+    if seconds > 0:
+        seconds = max(1.0, seconds)
+    elif seconds < 0 and seconds != -1:
+        # Only -1 and 0 are valid for auto mode; reject other negative values
+        raise ValueError("Duration must be > 0, or -1 or 0 for auto-detection.")
     steps = max(1, int(steps))
     guidance_scale = float(guidance_scale)
     omega_scale = float(omega_scale)
@@ -1169,8 +1175,9 @@ def generate_track_ace(
             )
 
     requested_total = float(target_seconds)
-    if requested_total <= 0:
-        raise ValueError("Target length must be > 0.")
+    # Allow -1 or 0 for auto-detection (pipeline will randomly select 30-240s)
+    if requested_total <= 0 and requested_total not in (-1, 0):
+        raise ValueError("Target length must be > 0, or -1 or 0 for auto-detection.")
 
     fade_in_seconds = max(0.0, float(fade_in_seconds))
     fade_out_seconds = max(0.0, float(fade_out_seconds))
