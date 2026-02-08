@@ -1,6 +1,4 @@
-<img height="250" alt="image" src="https://github.com/user-attachments/assets/000f485b-3bb1-48c4-8031-cd941eec6bf7" />
-
-# AceForge
+# <img height="250" alt="image" src="https://github.com/user-attachments/assets/000f485b-3bb1-48c4-8031-cd941eec6bf7" />
 
 AceForge is a **local-first AI music workstation for macOS Silicon** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
 
