@@ -245,6 +245,7 @@ export interface GenerationParams {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
+  coverBlendFactor?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;

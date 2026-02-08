@@ -96,6 +96,8 @@ export interface GenerationParams {
   repaintingEnd?: number;
   instruction?: string;
   audioCoverStrength?: number;
+  /** When cover uses a second (style) audio, 0 = more source, 1 = more style. */
+  coverBlendFactor?: number;
   taskType?: string;
   useAdg?: boolean;
   cfgIntervalStart?: number;

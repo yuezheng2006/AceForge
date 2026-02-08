@@ -626,6 +626,7 @@ export default function App() {
       const genParams = {
         customMode: params.customMode,
         songDescription: params.songDescription,
+        prompt: params.prompt,
         lyrics: params.lyrics,
         style: params.style,
         title: params.title,
@@ -656,6 +657,7 @@ export default function App() {
         repaintingEnd: params.repaintingEnd,
         instruction: params.instruction,
         audioCoverStrength: params.audioCoverStrength,
+        coverBlendFactor: params.coverBlendFactor,
         taskType: params.taskType,
         useAdg: params.useAdg,
         cfgIntervalStart: params.cfgIntervalStart,

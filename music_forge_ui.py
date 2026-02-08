@@ -395,9 +395,11 @@ try:
         preferences_bp,
         ace_step_models_bp,
     )
+    from api.generate import reset_generation_queue
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(songs_bp, url_prefix="/api/songs")
     app.register_blueprint(generate_bp, url_prefix="/api/generate")
+    reset_generation_queue()
     app.register_blueprint(playlists_bp, url_prefix="/api/playlists")
     app.register_blueprint(users_bp, url_prefix="/api/users")
     app.register_blueprint(contact_bp, url_prefix="/api/contact")

@@ -1,4 +1,6 @@
-# <img height="250" alt="image" src="https://github.com/user-attachments/assets/000f485b-3bb1-48c4-8031-cd941eec6bf7" />
+<img height="250" alt="image" src="https://github.com/user-attachments/assets/000f485b-3bb1-48c4-8031-cd941eec6bf7" />
+
+# AceForge
 
 AceForge is a **local-first AI music workstation for macOS Silicon** powered by **[ACE-Step](https://github.com/ace-step/ACE-Step)**<br>
 
@@ -58,6 +60,24 @@ AceForge is a **local-first AI music workstation for macOS Silicon** powered by 
 ```sudo xattr -cr /Applications/AceForge.app```
 
 > **Note:** The app bundle does NOT include the large model files. On first run, it will download the ACE-Step models (several GB) automatically. You can monitor the download progress in the Terminal window or in the Server Console panel in the web interface.
+
+### Option 2: Run locally for testing (developers)
+
+To run the app from source without building the `.app` bundle:
+
+1. **One-time setup:** Install dependencies (e.g. run the full build once to create the venv):
+   ```bash
+   ./build_local.sh
+   ```
+   This creates `venv_build/` and installs Python deps. You can cancel after the PyInstaller step if you only want to run locally.
+
+2. **Run the server:**
+   ```bash
+   ./run_local.sh
+   ```
+   This builds the React UI if needed (requires [Bun](https://bun.sh)), then starts the Flask server at **http://127.0.0.1:5056**. Open that URL in your browser to use AceForge.
+
+If you prefer to use your own venv instead of `venv_build`, install deps with `pip install -r requirements_ace_macos.txt` (and the same extra steps as in `build_local.sh` for TTS/ACE-Step), then run `python music_forge_ui.py`.
 
 ## Using AceForge (high-level workflow)
 

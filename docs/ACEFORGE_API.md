@@ -121,15 +121,17 @@ ACE-Step text-to-music (and related tasks). Jobs are queued and run one at a tim
 - `songDescription` or `style`: text prompt (caption).
 - `lyrics`: optional lyrics (or "[inst]" for instrumental).
 - `instrumental`: boolean (default true).
-- `duration`: seconds (15–240), or -1/0 for auto-detection (pipeline will randomly select 30–240s).
+- `duration`: seconds (15–240).
 - `inferenceSteps`: int (e.g. 55).
 - `guidanceScale`: float (e.g. 6.0).
 - `seed`: int; if `randomSeed` is true, server may override with random.
-- `taskType`: `"text2music"` | `"retake"` | `"repaint"` | `"extend"` | `"cover"` | `"audio2audio"` | `"lego"` | `"extract"` | `"complete"`. **Lego**, **extract**, and **complete** require the ACE-Step **Base** DiT model (see Preferences and ACE-Step models).
-- `instruction`: optional; for `taskType` **lego** (and extract/complete), task-specific instruction (e.g. `"Generate the guitar track based on the audio context:"`). If omitted for lego, the server builds one from track name/caption.
-- `referenceAudioUrl`, `sourceAudioUrl`: URLs like `/audio/refs/...` or `/audio/<filename>` for reference/cover. For **lego**, **extract**, and **complete**, **sourceAudioUrl** is the backing/source audio (required).
-- `audioCoverStrength` / `ref_audio_strength`: 0–1.
-- `repaintingStart`, `repaintingEnd`: for repaint task.
+- **Task and audio params** (see [ACE-Step Tutorial](https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/Tutorial.md#guiding-the-elephant-what-can-you-control)): The API accepts both **ACE-Step official names** (snake_case) and **UI names** (camelCase): `task_type` or `taskType`; `reference_audio` or `referenceAudioUrl` or `reference_audio_path`; `src_audio` or `sourceAudioUrl` or `source_audio_path`; `audio_cover_strength` or `audioCoverStrength` or `ref_audio_strength`.
+- `taskType` / `task_type`: `"text2music"` | `"retake"` | `"repaint"` | `"extend"` | `"cover"` | `"audio2audio"` | `"lego"` | `"extract"` | `"complete"`. **Lego**, **extract**, and **complete** require the ACE-Step **Base** DiT model (see Preferences and ACE-Step models).
+- `instruction`: optional; for **lego** (and extract/complete), task-specific instruction (e.g. `"Generate the guitar track based on the audio context:"`). If omitted for lego, the server builds one from track name/caption.
+- `reference_audio` / `referenceAudioUrl`: path or URL for reference audio (style/timbre). `src_audio` / `sourceAudioUrl`: path or URL for source/backing audio (cover, repaint, lego, etc.). For **lego**, **extract**, and **complete**, source audio is required.
+- `audio_cover_strength` / `audioCoverStrength`: 0–1 (reference/source influence strength). Defaults: **cover/retake** 0.8 (strong source); **audio2audio** 0.5 (matches [ACE-Step-MCP](https://huggingface.co/spaces/reach-vb/ACE-Step-MCP)); **lego** uses `legoBackingInfluence` (default 0.25).
+- `retake_variance` / `retakeVariance`: 0–1, default 0.2 (retake/repaint; aligned with ACE-Step-MCP).
+- `repaintingStart`, `repaintingEnd` / `repaint_start`, `repaint_end`: for repaint task; -1 end = end of audio.
 - `title`: base name for output file.
 - `outputDir` / `output_dir`: optional; else uses app default.
 - `keyScale`, `timeSignature`, `vocalLanguage`, `bpm`: optional.

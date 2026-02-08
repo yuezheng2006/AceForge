@@ -1232,7 +1232,7 @@ class ACEStepPipeline:
         use_erg_lyric=False,
         use_erg_diffusion=False,
         retake_random_generators=None,
-        retake_variance=0.5,
+        retake_variance=0.2,
         add_retake_noise=False,
         guidance_scale_text=0.0,
         guidance_scale_lyric=0.0,
@@ -1929,7 +1929,7 @@ class ACEStepPipeline:
         lora_name_or_path: str = "none",
         lora_weight: float = 1.0,
         retake_seeds: list = None,
-        retake_variance: float = 0.5,
+        retake_variance: float = 0.2,  # ACE-Step-MCP retake/repaint default
         task: str = "text2music",
         repaint_start: int = 0,
         repaint_end: int = 0,

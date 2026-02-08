@@ -567,9 +567,9 @@ def _prepare_reference_audio(
     src_audio_path: str | None,
 ) -> tuple[str, bool, Optional[str]]:
     """
-    Normalise the ACE-Step edit / audio2audio mode:
+    Normalise the ACE-Step edit / audio2audio mode (task_type, reference_audio, src_audio per Tutorial/INFERENCE):
 
-      - Task is clamped to one of: text2music / retake / repaint / extend.
+      - Task (task_type) is clamped to one of: text2music / retake / repaint / extend.
       - UI tasks "cover" and "audio2audio" are mapped to "retake" (ACE-Step
         then uses ref_audio_input and sets task to "audio2audio" internally).
       - If Audio2Audio is enabled while task is still 'text2music', we
@@ -830,11 +830,11 @@ def _run_ace_text2music(
     task: str = "text2music",
     repaint_start: float = 0.0,
     repaint_end: float = 0.0,
-    retake_variance: float = 0.5,
+    retake_variance: float = 0.2,  # MCP retake/repaint use 0.2
     src_audio_path: str | None = None,
-    # Audio2Audio + LoRA
+    # Audio2Audio + LoRA (ref_audio_strength 0.5 matches ACE-Step-MCP / pipeline default)
     audio2audio_enable: bool = False,
-    ref_audio_strength: float = 0.7,
+    ref_audio_strength: float = 0.5,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
     cancel_check: Optional[Callable[[], bool]] = None,
@@ -884,13 +884,7 @@ def _run_ace_text2music(
     if not tags:
         raise ValueError("ACE-Step: tags/prompt cannot be empty.")
 
-    # Allow -1 or 0 for auto-detection (pipeline randomly selects 30-240s); otherwise clamp to minimum 1.0s
-    seconds = float(seconds)
-    if seconds > 0:
-        seconds = max(1.0, seconds)
-    elif seconds < 0 and seconds != -1:
-        # Only -1 and 0 are valid for auto mode; reject other negative values
-        raise ValueError("Duration must be > 0, or -1 or 0 for auto-detection.")
+    seconds = max(1.0, float(seconds))
     steps = max(1, int(steps))
     guidance_scale = float(guidance_scale)
     omega_scale = float(omega_scale)
@@ -1128,9 +1122,9 @@ def generate_track_ace(
     task: str = "text2music",
     repaint_start: float = 0.0,
     repaint_end: float = 0.0,
-    retake_variance: float = 0.5,
+    retake_variance: float = 0.2,  # ACE-Step-MCP retake/repaint default
     audio2audio_enable: bool = False,
-    ref_audio_strength: float = 0.7,
+    ref_audio_strength: float = 0.5,  # ACE-Step-MCP / pipeline default
     src_audio_path: str | None = None,
     lora_name_or_path: str | None = None,
     lora_weight: float = 0.75,
@@ -1180,9 +1174,8 @@ def generate_track_ace(
             )
 
     requested_total = float(target_seconds)
-    # Allow -1 or 0 for auto-detection (pipeline will randomly select 30-240s)
-    if requested_total <= 0 and requested_total not in (-1, 0):
-        raise ValueError("Target length must be > 0, or -1 or 0 for auto-detection.")
+    if requested_total <= 0:
+        raise ValueError("Target length must be > 0.")
 
     fade_in_seconds = max(0.0, float(fade_in_seconds))
     fade_out_seconds = max(0.0, float(fade_out_seconds))
@@ -1231,7 +1224,7 @@ def generate_track_ace(
     if cfg_type not in ("apg", "cfg", "cfg_star"):
         cfg_type = "apg"
 
-    # Normalise edit / Audio2Audio settings before we talk to ACE-Step.
+    # Normalise edit / Audio2Audio (maps to ACE-Step task_type, ref_audio_input, src_audio, audio_cover_strength).
     task, audio2audio_enable, src_audio_path = _prepare_reference_audio(
         task,
         bool(audio2audio_enable),

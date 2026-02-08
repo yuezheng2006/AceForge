@@ -3,6 +3,11 @@
   Source: https://github.com/ace-step/ACE-Step-1.5/blob/main/docs/en/INFERENCE.md
   Use for: GenerationParams/GenerationConfig, task types (text2music, cover, repaint, etc.),
   reference_audio vs src_audio, audio_cover_strength, and parameter specs.
+
+  AceForge alignment: We align core defaults with the working ACE-Step-MCP reference
+  (https://huggingface.co/spaces/reach-vb/ACE-Step-MCP/blob/main/ui/components.py):
+  ref_audio_strength=0.5 (Audio2Audio/cover reference), retake_variance=0.2 (retake/repaint),
+  and pipeline param names ref_audio_input, src_audio_path, audio2audio_enable.
 -->
 
 # ACE-Step Inference API Documentation
