@@ -121,7 +121,7 @@ ACE-Step text-to-music (and related tasks). Jobs are queued and run one at a tim
 - `songDescription` or `style`: text prompt (caption).
 - `lyrics`: optional lyrics (or "[inst]" for instrumental).
 - `instrumental`: boolean (default true).
-- `duration`: seconds (15–240).
+- `duration`: seconds (15–240), or -1/0 for auto-detection (pipeline will randomly select 30–240s).
 - `inferenceSteps`: int (e.g. 55).
 - `guidanceScale`: float (e.g. 6.0).
 - `seed`: int; if `randomSeed` is true, server may override with random.
