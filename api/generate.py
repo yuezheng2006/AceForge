@@ -5,11 +5,21 @@ job queue stored under get_user_data_dir(). No auth. Real implementation (no moc
 
 import json
 import logging
+import re
 import threading
 import time
 import uuid
 from pathlib import Path
 from flask import Blueprint, jsonify, request, send_file
+
+def _uppercase_track_in_instruction(instruction):
+    """Uppercase TRACK_NAME in 'Generate the X track ...' to match ACE-Step (cli.py _default_instruction_for_task)."""
+    if not instruction or " track " not in instruction:
+        return instruction
+    m = re.search(r"(\bthe\s+)(\w+)(\s+track\b)", instruction, re.IGNORECASE)
+    if m:
+        return instruction[: m.start(2)] + m.group(2).upper() + instruction[m.end(2) :]
+    return instruction
 
 from cdmf_paths import get_output_dir, get_user_data_dir, load_config
 from cdmf_tracks import list_lora_adapters, load_track_meta, save_track_meta
@@ -122,22 +132,32 @@ def _run_generation(job_id: str) -> None:
         if task not in allowed_tasks:
             task = "text2music"
         # Single style/caption field drives all text conditioning (ACE-Step caption).
-        # Simple mode: songDescription. Advanced mode: style. Both can have key, time sig, vocal language.
-        prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
+        # Simple mode: songDescription. Advanced mode: style. Lego/extract/complete: instruction + caption only (no metas; source sets context).
+        if task in ("lego", "extract", "complete"):
+            instruction = (params.get("instruction") or "").strip()
+            caption = (params.get("style") or "").strip()
+            if not instruction and not caption:
+                instruction = "Generate an instrument track based on the audio context:"
+            prompt = None  # built below after we have duration/bpm/metas
+        else:
+            instruction = None
+            caption = None
+            prompt = (params.get("style") or "").strip() if custom_mode else (params.get("songDescription") or "").strip()
         key_scale = (params.get("keyScale") or "").strip()
         time_sig = (params.get("timeSignature") or "").strip()
         vocal_lang = (params.get("vocalLanguage") or "").strip().lower()
         extra_bits = []
-        if key_scale:
-            extra_bits.append(f"key {key_scale}")
-        if time_sig:
-            extra_bits.append(f"time signature {time_sig}")
-        if vocal_lang and vocal_lang not in ("unknown", ""):
-            extra_bits.append(f"vocal language {vocal_lang}")
-        if extra_bits:
-            prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
-        # When user explicitly chose English, reinforce in caption so model conditions on it
-        if vocal_lang == "en" and prompt:
+        if task != "lego":
+            if key_scale:
+                extra_bits.append(f"key {key_scale}")
+            if time_sig:
+                extra_bits.append(f"time signature {time_sig}")
+            if vocal_lang and vocal_lang not in ("unknown", ""):
+                extra_bits.append(f"vocal language {vocal_lang}")
+            if extra_bits:
+                prompt = f"{prompt}, {', '.join(extra_bits)}" if prompt else ", ".join(extra_bits)
+        # When user explicitly chose English, reinforce in caption so model conditions on it (skip for lego)
+        if task != "lego" and vocal_lang == "en" and prompt:
             if not prompt.lower().startswith("english"):
                 prompt = f"English vocals, {prompt}"
         if not prompt:
@@ -190,21 +210,32 @@ def _run_generation(job_id: str) -> None:
                     bpm = None
             except (TypeError, ValueError):
                 bpm = None
+        # Lego/extract/complete: instruction (uppercase track) + caption only. No metas — BPM/key/timesignature
+        # should match the input backing; passing them would be for cover/target-style mode.
+        if task in ("lego", "extract", "complete"):
+            instruction = _uppercase_track_in_instruction(
+                instruction or "Generate an instrument track based on the audio context:"
+            )
+            prompt = (instruction + "\n\n" + (caption or "")).strip() or instruction
         title = (params.get("title") or "Untitled").strip() or "Track"
         reference_audio_url = (params.get("referenceAudioUrl") or params.get("reference_audio_path") or "").strip()
         source_audio_url = (params.get("sourceAudioUrl") or params.get("src_audio_path") or "").strip()
-        # For cover/retake use source-first (song to cover); for style/reference use reference-first
-        if task in ("cover", "retake"):
+        # For cover/retake/lego use source-first (backing/song to cover); for style/reference use reference-first
+        if task in ("cover", "retake", "lego"):
             resolved = _resolve_audio_url_to_path(source_audio_url) if source_audio_url else None
             src_audio_path = resolved or (_resolve_audio_url_to_path(reference_audio_url) if reference_audio_url else None)
         else:
             resolved = _resolve_audio_url_to_path(reference_audio_url) if reference_audio_url else None
             src_audio_path = resolved or (_resolve_audio_url_to_path(source_audio_url) if source_audio_url else None)
 
-        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint).
-        # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; 0.5–0.8 = more caption influence.
+        # When reference/source audio is provided, enable Audio2Audio so ACE-Step uses it (cover/retake/repaint/lego).
+        # Lego/extract/complete: use ref_audio so the model gets backing as context; use LOW ref_audio_strength
+        # (e.g. 0.3) so diffusion starts from noisy backing and denoises toward the prompt (new instrument), not a copy.
+        # See docs/ACE-Step-INFERENCE.md: audio_cover_strength 1.0 = strong adherence; lower = more prompt influence.
         audio2audio_enable = bool(src_audio_path)
         ref_default = 0.8 if task in ("cover", "retake", "audio2audio") else 0.7
+        if task in ("lego", "extract", "complete"):
+            ref_default = 0.3  # low strength so output follows prompt (instrument) while matching backing timing
         ref_audio_strength = float(params.get("audioCoverStrength") or params.get("ref_audio_strength") or ref_default)
         ref_audio_strength = max(0.0, min(1.0, ref_audio_strength))
 
@@ -231,6 +262,10 @@ def _run_generation(job_id: str) -> None:
         thinking = bool(params.get("thinking", False))
         use_cot_metas = bool(params.get("useCotMetas", True))
         use_cot_caption = bool(params.get("useCotCaption", True))
+        # Lego/extract/complete: instruction must stay verbatim ("Generate the X track based on the audio context:").
+        # LM refinement would rephrase and can drop the track-type instruction, so disable CoT caption for these tasks.
+        if task in ("lego", "extract", "complete"):
+            use_cot_caption = False
         use_cot_language = bool(params.get("useCotLanguage", True))
         try:
             lm_temperature = float(params.get("lmTemperature") or params.get("lm_temperature") or 0.85)
@@ -403,7 +438,18 @@ def create_job():
         data = raw if isinstance(raw, dict) else {}
         logging.info("[API generate] Request body keys: %s", list(data.keys()) if data else [])
 
-        if not data.get("customMode") and not data.get("songDescription"):
+        task_for_validation = (data.get("taskType") or "text2music").strip().lower()
+        base_only_tasks = ("lego", "extract", "complete")
+        if task_for_validation in base_only_tasks:
+            # Lego/extract/complete: require source audio and caption/instruction (no songDescription)
+            src_audio = (data.get("sourceAudioUrl") or data.get("source_audio_path") or "").strip()
+            instruction = (data.get("instruction") or "").strip()
+            style = (data.get("style") or "").strip()
+            if not src_audio:
+                return jsonify({"error": "Backing/source audio required for Lego (and extract/complete)"}), 400
+            if not instruction and not style:
+                return jsonify({"error": "Describe the track (caption) or instruction required for Lego"}), 400
+        elif not data.get("customMode") and not data.get("songDescription"):
             return jsonify({"error": "Song description required for simple mode"}), 400
         # Custom mode: require at least one of style, lyrics, reference audio, or source audio
         if data.get("customMode"):
