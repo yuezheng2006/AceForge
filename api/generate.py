@@ -157,6 +157,9 @@ def _run_generation(job_id: str) -> None:
         # UI may send duration=-1 or 0 for auto-detection; only clamp positive values to valid range (15–240s)
         if duration > 0:
             duration = max(15, min(240, duration))
+        elif duration < 0 and duration != -1:
+            # Only -1 is valid for auto mode; reject other negative values
+            duration = -1
         # Guide: 65 steps + CFG 4.0 for best quality; low CFG reduces artifacts (see community guide).
         try:
             steps = int(params.get("inferenceSteps") or 65)

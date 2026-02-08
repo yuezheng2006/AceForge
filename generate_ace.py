@@ -883,6 +883,9 @@ def _run_ace_text2music(
     seconds = float(seconds)
     if seconds > 0:
         seconds = max(1.0, seconds)
+    elif seconds < 0 and seconds != -1:
+        # Only -1 is valid for auto mode; reject other negative values
+        raise ValueError("Duration must be > 0 or -1/0 for auto-detection.")
     steps = max(1, int(steps))
     guidance_scale = float(guidance_scale)
     omega_scale = float(omega_scale)
