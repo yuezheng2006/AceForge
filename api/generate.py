@@ -158,7 +158,7 @@ def _run_generation(job_id: str) -> None:
         if duration > 0:
             duration = max(15, min(240, duration))
         elif duration < 0 and duration != -1:
-            # Only -1 is valid for auto mode; reject other negative values
+            # Normalize invalid negative values to -1 (auto mode) for defensive programming
             duration = -1
         # Guide: 65 steps + CFG 4.0 for best quality; low CFG reduces artifacts (see community guide).
         try:
